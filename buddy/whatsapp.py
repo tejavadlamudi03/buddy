@@ -23,7 +23,8 @@ from . import apps, config, language, share
 
 COMPOSER = 'footer div[contenteditable="true"]'
 QR_CODE = 'canvas[aria-label*="scan" i], div[data-ref]'
-SEND_BUTTON = '[data-icon*="send"], [aria-label="Send"], [aria-label="Senden"]'
+# By label's start: the preview's button reads "Send 1 selected".
+SEND_BUTTON = '[data-icon*="send"], [aria-label^="Send" i], [aria-label^="Senden" i]'
 MESSAGES = '#main [data-testid="msg-container"]'
 PREVIEW_SECONDS = 20
 # True while something, like the file preview, sits on top of the message box.
