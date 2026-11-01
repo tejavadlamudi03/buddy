@@ -99,7 +99,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.get("/api/settings", dependencies=guarded)
     def read_settings():
         current = config.load()
-        return {key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control")}
+        return {key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control", "ai_model")}
 
     @app.post("/api/settings", dependencies=guarded)
     def write_settings(body: Settings):
