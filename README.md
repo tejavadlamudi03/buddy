@@ -100,6 +100,8 @@ from the app menu brings its window to the front, and closing that window leaves
 | "Send me report.pdf", "Send me the latest download" | Sends a file to your WhatsApp |
 | "Download https://example.com/a.pdf", "Download https://example.com/a.docx as pdf and send it to me" | Saves it in Downloads and converts it if you asked. From WhatsApp the file comes back to you |
 | "Convert report.docx to pdf", "Send me the latest download as mp3" | Converts audio, video, pictures, documents, sheets and slides, and zips anything. The original stays |
+| "Remind me in 10 minutes to call home", "Remind me tomorrow at 9 to pay rent", "Set a timer for 5 minutes" | Tells you when it's time. Asked on WhatsApp, it answers only there. Asked aloud, it speaks and also messages you |
+| "What are my reminders", "Cancel my reminders", "Cancel the reminder about rent" | Lists or removes them |
 | "Report", "How is my laptop" | Battery, memory, disk, Wi-Fi, windows and what's playing |
 | "Run df -h" | Reads the command back, then runs it after "yes" and returns the output |
 | "Open Bluetooth settings", "Open my downloads", "Zoom in", "Snap left", "Next workspace" | Settings pages, folders, windows |
@@ -122,6 +124,13 @@ Everything arrives in `~/Downloads`. Buddy sends files up to 50 MB to WhatsApp a
 is bigger. Only send links you trust: a downloaded file is never run, but converting one does open it in
 ffmpeg or LibreOffice. YouTube and similar sites aren't handled, so a link to one saves just the page.
 "Stop" cancels a download or conversion. Private files can't be converted, because the copy wouldn't be private.
+
+## Reminders
+
+They're kept in `~/.local/share/buddy/reminders.json` and survive a restart. The laptop must be awake at
+that time, so use "Stay awake" for anything important: a reminder due while it slept arrives after it
+wakes, and says when it was due. Buddy repeats the time back, so you can check it understood. A time with
+no am or pm means the next one coming up today, or a waking hour tomorrow.
 
 ## Private files
 

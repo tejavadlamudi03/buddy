@@ -31,7 +31,7 @@ VERBS = (
 )
 CLAUSE_BREAK = re.compile(rf"\s*(?:,\s*)?(?:\band then\b|\bthen\b|\band\b|,)\s+(?=(?:{VERBS})\b)", re.I)
 # Dictated words, commands and links to fetch keep their "and"s.
-TYPING = re.compile(r"^(?:type|write|run|download|convert|export)\b|^(?:fetch|get|save|grab|send me)\b.*https?://", re.I)
+TYPING = re.compile(r"^(?:type|write|run|download|convert|export|remind|(?:set|add) a reminder)\b|^(?:fetch|get|save|grab|send me)\b.*https?://", re.I)
 MEDIA_ACTIONS = {"next_track", "previous_track", "pause_media", "resume_media", "now_playing"}
 SONG = r"(?:song|track|video|music)"
 BROWSER_NAMES = {"chrome", "google chrome", "browser", "the browser"}
@@ -113,6 +113,8 @@ FIXED.update({
     _LIVE_SCREEN: ("share_screen", {}),
     _LIVE_SCREEN + r"(?: with (?:full )?control| and let me control it)": ("share_screen", {"control": True}),
     r"stop (?:sharing|streaming)(?: my| the)?(?: screen)?": ("stop_sharing", {}),
+    r"(?:what are|show(?: me)?|list|tell me)(?: my| the)? reminders|my reminders|do i have any reminders|what reminders do i have": ("list_reminders", {}),
+    r"(?:cancel|delete|clear|remove)(?: all)?(?: of)?(?: my| the)? (?:reminders?|timers?)": ("cancel_reminders", {}),
     r"(?:allow|let)(?: the| my| this)?(?: laptop| computer| pc| it| yourself)?(?: to)?(?: go to)? sleep(?: again)?|"
     r"(?:you|it) can(?: go to)? sleep(?: again)?|stop staying awake": ("allow_sleep", {}),
     r"what(?:'s| is) the time|what time is it|tell me the time": ("tell_time", {}),
@@ -202,6 +204,37 @@ def _download_step(text: str) -> Step | None:
     return found
 
 
+_AMOUNT = r"(?:\d+(?:\.\d+)?|an?|half an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+_LENGTH = rf"{_AMOUNT}\s*(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?)(?:(?:\s+and)?\s+{_AMOUNT}\s*(?:seconds?|secs?|minutes?|mins?|hours?|hrs?))?"
+_IN_TIME = re.compile(rf"\b(?:in|after)\s+({_LENGTH})\b", re.I)
+_AT_TIME = re.compile(
+    r"\b(?:(tomorrow|today)\s+)?(?:at\s+)(\d{1,2})(?:[:.](\d{2}))?\s*([ap]\.?m\.?)?(?=\s|$)(?:\s+(tomorrow|today)\b)?", re.I)
+
+
+def _reminder_step(text: str) -> Step | None:
+    if match := re.fullmatch(rf"(?:(?:set|start)(?: a| an| me a)?\s+)?(?:timer(?: for)?\s+({_LENGTH})|({_LENGTH})\s+timer)", text, re.I):
+        length = match.group(1) or match.group(2)
+        return {"action": "remind", "text": f"your {length} timer is up", "seconds": duration_seconds(length)}
+    match = re.fullmatch(r"(?:remind(?: me)?|(?:set|add) a reminder)\s+(.*)", text, re.I)
+    if not match:
+        return None
+    body = match.group(1)
+    found: Step = {"action": "remind"}
+    if when := _IN_TIME.search(body):
+        found["seconds"] = duration_seconds(when.group(1))
+    elif when := _AT_TIME.search(body):
+        found["hour"], found["minute"] = int(when.group(2)), int(when.group(3) or 0)
+        if when.group(4):
+            found["meridiem"] = when.group(4)[0].lower()
+        if day := (when.group(1) or when.group(5) or "").lower():
+            found["day"] = day
+    else:
+        return {"action": "reply", "text": "When should I remind you? Say something like: remind me in 10 minutes to call home"}
+    what = " ".join(f"{body[:when.start()]} {body[when.end():]}".split())
+    found["text"] = re.sub(r"^(?:me\s+)?(?:to|about|that|for)\s+", "", what, flags=re.I).strip(" ,.") or "you asked me to remind you"
+    return found
+
+
 def _convert_step(text: str) -> Step | None:
     match = re.fullmatch(rf"(?:convert|export)\s+(.+?)\s+(?:to|into|as|in) {_FORMAT}\s*{_AND_SEND}", text, re.I)
     send = bool(match and match.group(3))
@@ -258,9 +291,11 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
     if match := re.fullmatch(r"(?:type|write(?!\s+(?:me|us|a|an|some|the|my|code|python|java\w*)\b))(?: down| out)?[:,]?\s+(.+)",
                              text, re.I | re.S):
         return [step("type_text", text=match.group(1))]
-    fetched = _download_step(text) or _convert_step(text)
+    fetched = _download_step(text) or _convert_step(text) or _reminder_step(text)
     if fetched:
         return [fetched]
+    if match := re.fullmatch(r"cancel(?: the| my)? (?:reminder|timer)(?: (?:to|about|for))? (.+)", text, re.I):
+        return [step("cancel_reminders", words=match.group(1).strip())]
 
     if match := re.fullmatch(
         r"(?:stay awake|keep(?: the| my| this)?(?: laptop| computer| pc| it| yourself)? awake|"

@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import actions, awake, config, share, whatsapp
+from . import actions, awake, config, reminders, share, whatsapp
 from .engine import Engine
 from .listen import Listener, telugu_ear
 from .stt import Transcriber
@@ -43,6 +43,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     voice_notes = Listener(Transcriber(settings["voice_note_model"], beam_size=5, skip_silence=False), telugu)
     threading.Thread(target=voice_notes.load, daemon=True).start()
     whatsapp.start_bridge(engine, voice_notes)
+    reminders.start(engine)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     # Stops other websites reaching this server by pointing their own domain at 127.0.0.1.

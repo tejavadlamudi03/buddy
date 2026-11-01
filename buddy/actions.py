@@ -7,10 +7,10 @@ import subprocess
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import a11y, apps, awake, config, desktop, fetch, files, media, ocr, share, whatsapp
+from . import a11y, apps, awake, config, desktop, fetch, files, media, ocr, reminders, share, whatsapp
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -19,7 +19,7 @@ COMMAND_SECONDS = 120
 MAX_COMMAND_OUTPUT = 3000
 # Never by voice or from the Buddy page: at a lock screen, anyone in the room could say it.
 WHATSAPP_ONLY = {"unlock_screen"}
-SENDS_FILE = {"download", "convert_file"}
+ANSWER_ON_WHATSAPP = {"download", "convert_file", "remind"}  # asked from a phone, so that's where the result goes
 
 
 class UnknownTarget(LookupError):
@@ -593,6 +593,36 @@ def convert_file(name: str, to: str, send: bool = False) -> str:
     if files.is_private(path):  # a copy in Downloads would no longer be private
         return f"{path.name} is private, so I won't convert it"
     return _hand_over(fetch.convert(path, to), send)
+
+
+@action
+def remind(text: str, seconds: float | None = None, hour: int | None = None, minute: int = 0,
+           meridiem: str = "", day: str = "", send: bool = False) -> str:
+    now = datetime.now()
+    if seconds is not None:
+        moment = now + timedelta(seconds=seconds)
+    else:
+        moment = reminders.clock_time(hour, minute, meridiem, day, now)
+    if (moment - now).total_seconds() > reminders.MAX_SECONDS:
+        return "That's too far away for me to remember"
+    reminders.add(moment.timestamp(), text, send)
+    return f"Okay, I'll remind you {reminders.spoken(moment, now)}: {text}"
+
+
+@action
+def list_reminders() -> str:
+    items = reminders.upcoming()
+    if not items:
+        return "You have no reminders"
+    return "\n".join(f"{reminders.spoken(datetime.fromtimestamp(item['when']))}: {item['text']}" for item in items)
+
+
+@action
+def cancel_reminders(words: str = "") -> str:
+    removed = reminders.cancel(words)
+    if not removed:
+        return f"I couldn't find a reminder about {words}" if words else "You have no reminders"
+    return "Cancelled that reminder" if removed == 1 else f"Cancelled {removed} reminders"
 
 
 @action

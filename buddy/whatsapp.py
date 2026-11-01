@@ -625,6 +625,10 @@ def fetch_document(page: Page, row_id: str, name: str) -> Path:
 _bridge: Bridge | None = None
 
 
+def current_bridge() -> Bridge | None:
+    return _bridge
+
+
 def start_bridge(engine, transcriber=None) -> None:
     global _bridge
     _bridge = Bridge(engine, transcriber)

@@ -249,8 +249,8 @@ class Engine:
         actions_asked = {step["action"] for step in steps}
         if self._source == "whatsapp" and "screenshot" in actions_asked and "whatsapp_send_screenshot" not in actions_asked:
             steps = [*steps, {"action": "whatsapp_send_screenshot"}]  # from a phone, a saved picture is no use
-        if self._source == "whatsapp":  # likewise a file only saved on the laptop
-            steps = [{**step, "send": True} if step["action"] in actions.SENDS_FILE else step for step in steps]
+        if self._source == "whatsapp":
+            steps = [{**step, "send": True} if step["action"] in actions.ANSWER_ON_WHATSAPP else step for step in steps]
         if not confirmed and any(actions.is_risky(step) for step in steps):
             self.pending, self.pending_since, self.pending_source = steps, time.monotonic(), self._source
             risk = next(actions.risk_of(step) for step in steps if actions.is_risky(step))
