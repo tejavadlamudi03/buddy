@@ -5,7 +5,7 @@ import time
 import pytest
 from PIL import Image
 
-from buddy import actions, attachments, engine as engine_module, language
+from buddy import actions, attachments, engine as engine_module, language, whatsapp
 from buddy.attachments import Attachment
 from buddy.engine import Engine
 
@@ -140,3 +140,31 @@ def test_busy_engine_says_so_and_keeps_going(monkeypatch):
 def test_caption_defaults_differ_for_pictures_and_documents():
     assert "Describe" in language.about_file(Attachment("a.jpg", pictures=[b"x"]))
     assert "Summarise" in language.about_file(Attachment("a.txt", text="x"))
+
+
+class _ClosedPage:
+    def is_closed(self):
+        return True
+
+
+def _bridge_failing_to_fetch(monkeypatch):
+    def fail(page, row_id):
+        raise RuntimeError("Target closed")
+
+    monkeypatch.setattr(whatsapp, "fetch_picture", fail)
+    bridge = whatsapp.Bridge.__new__(whatsapp.Bridge)
+    bridge._retry = None
+    return bridge
+
+
+def test_a_file_lost_to_a_chrome_crash_is_read_once_more_only(monkeypatch):
+    bridge = _bridge_failing_to_fetch(monkeypatch)
+    row = {"id": "1", "image": True, "meta": "12:00"}
+    monkeypatch.setattr(whatsapp, "age_in_minutes", lambda stamp, now: 0)
+    with pytest.raises(RuntimeError):
+        bridge._read_file(_ClosedPage(), row)
+    assert bridge._retry["retried"]
+    again = bridge._retry
+    with pytest.raises(RuntimeError):
+        bridge._read_file(_ClosedPage(), again)
+    assert bridge._retry is None

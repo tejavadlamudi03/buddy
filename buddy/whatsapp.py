@@ -346,6 +346,7 @@ class Bridge:
         self._reply_from = None
         self._last_link = None
         self._unsure = None  # (text, heard_at) for a voice note waiting for a yes
+        self._retry = None  # a file being read when Chrome went down
         self.heard_clearly = True
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -394,6 +395,9 @@ class Bridge:
                       f"{kinds.count('media')} media", flush=True)
                 if _should_announce():
                     _send_text(page, "Buddy is online. Send me a command.")
+                retry, self._retry = self._retry, None
+                if retry:
+                    self._handle_media(page, retry)
                 while self._still_wanted():
                     self._do_tasks(page)
                     if page.evaluate(CHAT_TITLE) != title:
@@ -487,6 +491,9 @@ class Bridge:
             return
         except Exception as error:
             print(f"Reading a file failed: {type(error).__name__}: {str(error)[:200]}", flush=True)
+            if page.is_closed():  # Chrome itself went down: its restart reads the file once more
+                self._retry = None if row.get("retried") else {**row, "retried": True}
+                raise
             _send_text(page, "I couldn't open that file. Please send it again, or paste the text.")
             return
         if self._reply_from is None:
