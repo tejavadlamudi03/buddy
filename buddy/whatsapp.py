@@ -19,7 +19,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
 
-from . import apps, config, language, share
+from . import apps, attachments, config, fetch, language, share
 
 COMPOSER = 'footer div[contenteditable="true"]'
 QR_CODE = 'canvas[aria-label*="scan" i], div[data-ref]'
@@ -45,6 +45,8 @@ WINDOW_CLASS = "BuddyWhatsApp"
 # WhatsApp Web turns away browsers that identify themselves as headless.
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
 POLL_MS = 1500
+MEDIA_SECONDS = 40
+RECLICK_SECONDS = 6
 MAX_COMMAND_CHARS = 12000  # a long text to review; about what fits in the model's context
 MAX_AGE_MINUTES = 3
 MAX_MESSAGE_CHARS = 3500
@@ -71,16 +73,25 @@ READ_ROWS = """
   if (!main) return [];
   const box = main.getBoundingClientRect();
   const counts = {}, out = [];
+  const onLeft = e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left - box.left) < (box.right - r.right); };
   for (const row of main.querySelectorAll('[data-id]')) {
     const tailOut = !!row.querySelector('[data-icon="tail-out"]');
-    const tailIn = !!row.querySelector('[data-icon="tail-in"]');
     const stamps = [...row.querySelectorAll('[data-pre-plain-text]')];
-    if (!stamps.length) {
-      if (tailIn && !tailOut) out.push({
-        key: 'media:' + row.dataset.id, kind: 'media', id: row.dataset.id,
-        voice: !!row.querySelector('[role="slider"], input[type="range"]'),
-        meta: (row.querySelector('[data-testid="msg-meta"]') || {}).innerText || '',
-      });
+    const image = !!row.querySelector('[data-testid="image-thumb"]');
+    const documentThumb = row.querySelector('[data-testid="document-thumb"]');
+    const voice = !!row.querySelector('[role="slider"], input[type="range"]');
+    const bubble = row.querySelector('[data-testid="msg-container"]') || row;
+    if (image || documentThumb || voice || !stamps.length) {
+      // Only the first message in a run has a tail, so direction comes from which side it sits on.
+      if (!tailOut && onLeft(bubble)) {
+        const view = [...row.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(l => /^(view|anzeigen)\b/i.test(l)) || '';
+        out.push({
+          key: 'media:' + row.dataset.id, kind: 'media', id: row.dataset.id, voice, image, document: !!documentThumb,
+          name: (view.match(/"(.+)"/) || [])[1] || '',
+          caption: stamps.map(e => (e.querySelector('.selectable-text') || {}).innerText || '').join(' ').trim(),
+          meta: (row.querySelector('[data-testid="msg-meta"]') || {}).innerText || '',
+        });
+      }
       continue;
     }
     for (const element of stamps) {
@@ -202,6 +213,36 @@ AUDIO_DIAGNOSIS = """
 () => ({blobs: window.__buddyBlobTypes.slice(-6), plays: window.__buddyPlays.length,
         audio_tags: document.querySelectorAll('audio').length})
 """
+
+# The largest decrypted picture, in a message or, once one is opened, in the viewer on top of the chat.
+READ_PICTURE = """
+async id => {
+  const row = id && [...document.querySelectorAll('#main [data-id]')].find(r => r.dataset.id === id);
+  const pictures = [...(row || document).querySelectorAll('img[src^="blob:"]')].filter(i => i.naturalWidth);
+  const largest = pictures.sort((a, b) => b.naturalWidth - a.naturalWidth)[0];
+  if (!largest) return null;
+  const blob = await (await fetch(largest.src)).blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+"""
+# Each row's way in: the picture or the document itself.
+OPEN_MEDIA = """
+id => {
+  const row = [...document.querySelectorAll('#main [data-id]')].find(r => r.dataset.id === id);
+  if (!row) return false;
+  const inside = row.querySelector('[aria-label^="View"], [aria-label^="Open"], [aria-label^="Anzeigen"], [aria-label^="Öffnen"]')
+    || row.querySelector('[data-testid="document-thumb"], [data-testid="image-thumb"]');
+  if (!inside) return false;
+  (inside.closest('[role="button"], button') || inside).click();
+  return true;
+}
+"""
+VIEWER_DOWNLOAD = '[aria-label="Download"], [title="Download"], [aria-label="Herunterladen"], [title="Herunterladen"]'
 
 # Page structure only, for diagnosing WhatsApp layout changes. Never message text, names or numbers.
 PAGE_SHAPE = """
@@ -434,9 +475,30 @@ class Bridge:
         self.heard_clearly = no_speech <= CLEAR_NO_SPEECH and confidence >= CLEAR_CONFIDENCE
         return text
 
+    def _read_file(self, page, row: dict) -> None:
+        age = age_in_minutes("[" + (row.get("meta") or "").strip(), datetime.now())
+        if age is None or age > MAX_AGE_MINUTES:  # same rule as text: late arrivals never run
+            return
+        try:
+            path = fetch_picture(page, row["id"]) if row.get("image") else fetch_document(page, row["id"], row.get("name") or "")
+            attachment = attachments.read(path)
+        except ValueError as error:
+            _send_text(page, str(error))
+            return
+        except Exception as error:
+            print(f"Reading a file failed: {type(error).__name__}: {str(error)[:200]}", flush=True)
+            _send_text(page, "I couldn't open that file. Please send it again, or paste the text.")
+            return
+        if self._reply_from is None:
+            self._reply_from = len(self.engine.events)
+        self.engine.submit_file(row.get("caption") or "", attachment)
+
     def _handle_media(self, page, row: dict) -> None:
+        if row.get("image") or row.get("document"):
+            self._read_file(page, row)
+            return
         if not row.get("voice") or self.transcriber is None:
-            _send_text(page, "I can only read text and voice notes. Please send that as a message.")
+            _send_text(page, "I can read text, voice notes, pictures and documents, but not that. Please send it as one of those.")
             return
         age = age_in_minutes("[" + (row.get("meta") or "").strip(), datetime.now())
         if age is None or age > MAX_AGE_MINUTES:  # same rule as text: late arrivals never run
@@ -491,6 +553,66 @@ class Bridge:
         if link and link != self._last_link:
             _send_text(page, f"Open your live screen here: {link}")
         self._last_link = link
+
+
+def _close_viewer(page) -> None:
+    """Escape only with something open: with nothing open, it closes the chat itself."""
+    for _ in range(2):
+        if not page.evaluate(COMPOSER_COVERED):
+            return
+        page.keyboard.press("Escape")
+        _wait_for(page, COMPOSER_COVERED, False, 4)  # the document viewer takes a moment to go
+
+
+def fetch_picture(page: Page, row_id: str) -> Path:
+    """Saved in Downloads, so "convert it" and "send me the latest download" work on it afterwards."""
+    def read(scope):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if found := page.evaluate(READ_PICTURE, scope):
+                return found
+            page.wait_for_timeout(300)
+        return None
+
+    data = read(row_id)
+    if data is None:  # not fetched yet, as in a chat that hasn't been opened since it arrived
+        page.evaluate(OPEN_MEDIA, row_id)
+        data = read(None)
+        _close_viewer(page)
+    if data is None:
+        raise RuntimeError("the picture didn't load")
+    return fetch.save_received(f"whatsapp-photo-{datetime.now():%Y%m%d-%H%M%S}.jpg", base64.b64decode(data))
+
+
+def fetch_document(page: Page, row_id: str, name: str) -> Path:
+    arrived = []
+
+    def on_download(download):
+        arrived.append(download)
+
+    page.on("download", on_download)
+    try:
+        if not page.evaluate(OPEN_MEDIA, row_id):
+            raise RuntimeError("couldn't find the document in the chat")
+        deadline = time.monotonic() + MEDIA_SECONDS
+        pressed = False
+        click_again = time.monotonic() + RECLICK_SECONDS
+        while not arrived and time.monotonic() < deadline:
+            page.wait_for_timeout(300)
+            button = page.locator(VIEWER_DOWNLOAD).first  # some types open in a viewer instead of downloading
+            if not pressed and button.count() and button.is_visible():
+                button.click(timeout=3_000)
+                pressed = True
+            elif not pressed and time.monotonic() > click_again:  # WhatsApp sometimes ignores the first click
+                page.evaluate(OPEN_MEDIA, row_id)
+                click_again = time.monotonic() + RECLICK_SECONDS
+        if not arrived:
+            raise RuntimeError("the document didn't download in time")
+        download = arrived[0]
+        return fetch.save_received(name or download.suggested_filename, Path(download.path()).read_bytes())
+    finally:
+        page.remove_listener("download", on_download)
+        _close_viewer(page)
 
 
 _bridge: Bridge | None = None

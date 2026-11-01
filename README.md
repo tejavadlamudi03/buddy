@@ -55,7 +55,12 @@ sends the screen, "Share my screen with control" sends a live link, and "Stop" c
 actions wait for "yes". Buddy reads only the chat it opened by that number, and only messages under 3 minutes old. Other
 chats are never read. Voice notes work too, in English or Telugu: Buddy transcribes them locally,
 tells you what it heard, then acts on it. If it isn't sure of the English, it shows what it heard
-and waits for "yes". Other media gets a reply asking for text.
+and waits for "yes".
+
+Send a picture, PDF, document, sheet, slides or text file and the local AI reads it, using your
+caption as the question, and you can ask more about it for 30 minutes. A copy is saved in Downloads.
+It's only ever discussed: neither the caption nor anything written in the file can run as a command.
+It reads about 12000 characters of a document, or the first 3 pages of a scan, and says when it stopped.
 
 You can also just talk to the local AI there: ask questions, paste text to review, ask for code.
 It remembers the last few messages, so "make it shorter" works, and replies in your language. It

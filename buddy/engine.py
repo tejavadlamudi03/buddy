@@ -1,4 +1,5 @@
 """Takes transcribed speech and runs it: wake word, stop, confirmation, rules, then agent."""
+import base64
 import re
 import threading
 import time
@@ -25,6 +26,7 @@ PASTED_CHARS = 300  # this long, or several lines: material to discuss, which mu
 LINK = re.compile(r"https?://\S+")  # download links can be very long, and aren't what makes text pasted
 HISTORY_CHARS = 1500
 AGENT_HISTORY_CHARS = 200  # the agent's context also has to hold the screen
+ATTACHMENT_SECONDS = 30 * 60  # how long follow-up questions can still be about a file
 
 
 @dataclass
@@ -41,6 +43,8 @@ class Engine:
     speaker: Any = None
     recent: list = field(default_factory=list)
     resume: tuple | None = None  # (task, history, asked_at) while the agent awaits an answer
+    attachment: Any = None  # the file last sent on WhatsApp
+    attachment_at: float = 0.0
     _stop: threading.Event = field(default_factory=threading.Event)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -98,6 +102,21 @@ class Engine:
         threading.Thread(target=self._process, args=(text,), daemon=True).start()
         return True
 
+    def submit_file(self, question: str, attachment) -> None:
+        """A file and its caption. Only ever discussed: the caption can't run as a command, nor can what's in the file."""
+        if self.busy:
+            self.emit("say", "Still working on the last one. Send the file again when I'm done, or say stop.", True)
+            return
+        self.emit("heard", f"[{attachment.name}] {question}".strip())
+        self.attachment, self.attachment_at = attachment, time.monotonic()
+        self.busy = True
+        self._source = "whatsapp"
+        self._stop.clear()
+        threading.Thread(target=self._process, args=(question or language.about_file(attachment),), kwargs={"talk_only": True}, daemon=True).start()
+
+    def _fresh_attachment(self):
+        return self.attachment if time.monotonic() - self.attachment_at < ATTACHMENT_SECONDS else None
+
     def _is_follow_up(self, text: str) -> bool:
         """Right after a command, carry on without the wake word, as in a conversation.
 
@@ -117,10 +136,12 @@ class Engine:
             return True
         return self.pending is not None and time.monotonic() - self.pending_since < CONFIRM_SECONDS
 
-    def _process(self, text: str) -> None:
+    def _process(self, text: str, talk_only: bool = False) -> None:
         quiet = self._source == "whatsapp"
         try:
-            answer = self._handle(text)
+            answer = self._talk(text) if talk_only else self._handle(text)
+            if talk_only and self.attachment.note:
+                answer = f"{self.attachment.note}\n\n{answer}"
             self.recent = (self.recent + [(clean(text), answer)])[-RECENT_TURNS:]
             self.emit("say" if len(answer) <= SPOKEN_LIMIT else "report", answer, quiet)
         except Exception as error:
@@ -173,7 +194,8 @@ class Engine:
         if not agent_enabled or (unknown and not ai.installed()):
             return unknown or "I didn't understand that"
         self.emit("log", "Not a built-in command, asking the local AI")
-        english, kind = language.understand(text)
+        file = self._fresh_attachment()
+        english, kind = language.understand(text, file.name if file else "")
         if (links := LINK.findall(text)) and not LINK.search(english):  # the model sometimes writes "this link" instead
             english = f"{english} {links[0]}"
         if kind == "chat":
@@ -194,9 +216,15 @@ class Engine:
         for said, answer in self.recent:
             messages += [{"role": "user", "content": said[:HISTORY_CHARS]},
                          {"role": "assistant", "content": answer[:HISTORY_CHARS]}]
-        messages.append({"role": "user", "content": text})
+        latest = {"role": "user", "content": text}
+        system = language.chat_prompt(text)
+        if file := self._fresh_attachment():
+            system += language.file_context(file)
+            if file.pictures:
+                latest["images"] = [base64.b64encode(picture).decode() for picture in file.pictures]
+        messages.append(latest)
         try:
-            answer = language.tidy(ai.talk(config.load()["ai_model"], language.chat_prompt(text), messages)).strip()
+            answer = language.tidy(ai.talk(config.load()["ai_model"], system, messages)).strip()
         except ai.NotReady as error:
             return str(error)
         if self._stop.is_set():

@@ -161,13 +161,13 @@ def test_understand_falls_back_to_the_agent_on_a_bad_reply(monkeypatch):
 
 
 def test_telugu_command_runs_the_same_rule_as_english(power, monkeypatch):
-    monkeypatch.setattr(language, "understand", lambda text: ("lock the screen", "control"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": ("lock the screen", "control"))
     say(Engine(), "స్క్రీన్ లాక్ చెయ్యి")
     assert power == ["lock"]
 
 
 def test_a_telugu_shutdown_still_waits_for_a_telugu_yes(power, monkeypatch):
-    monkeypatch.setattr(language, "understand", lambda text: ("shut down the laptop", "control"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": ("shut down the laptop", "control"))
     engine = Engine()
     say(engine, "లాప్‌టాప్ షట్ డౌన్ చెయ్యి")
     assert power == [] and "Are you sure" in engine.events[-1]["text"]
@@ -176,7 +176,7 @@ def test_a_telugu_shutdown_still_waits_for_a_telugu_yes(power, monkeypatch):
 
 
 def test_a_telugu_no_cancels(power, monkeypatch):
-    monkeypatch.setattr(language, "understand", lambda text: ("shut down the laptop", "control"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": ("shut down the laptop", "control"))
     engine = Engine()
     say(engine, "లాప్‌టాప్ షట్ డౌన్ చెయ్యి")
     say(engine, "వద్దు")
@@ -192,7 +192,7 @@ def test_a_telugu_stop_stops():
 def test_a_control_request_the_rules_miss_goes_to_the_agent_in_english(power, monkeypatch):
     tasks = []
     monkeypatch.setattr("buddy.agent.run", lambda task, *a, **k: tasks.append(task) or ("Done it", None))
-    monkeypatch.setattr(language, "understand", lambda text: ("rearrange the desktop icons", "control"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": ("rearrange the desktop icons", "control"))
     say(Engine(), "డెస్క్‌టాప్ ఐకాన్లు సర్దు")
     assert tasks == ["rearrange the desktop icons"]
 
@@ -200,7 +200,7 @@ def test_a_control_request_the_rules_miss_goes_to_the_agent_in_english(power, mo
 def test_chat_is_answered_in_the_users_words_and_never_reaches_the_agent(power, monkeypatch):
     asked = []
     monkeypatch.setattr("buddy.agent.run", lambda *a, **k: pytest.fail("the agent ran"))
-    monkeypatch.setattr(language, "understand", lambda text: ("what is the capital of India", "chat"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": ("what is the capital of India", "chat"))
     monkeypatch.setattr(ai, "talk", lambda model, system, messages: asked.append(messages) or "ఢిల్లీ")
     engine = Engine()
     say(engine, "భారతదేశ రాజధాని ఏది?")
@@ -209,7 +209,7 @@ def test_chat_is_answered_in_the_users_words_and_never_reaches_the_agent(power, 
 
 def test_chat_remembers_the_conversation(power, monkeypatch):
     asked = []
-    monkeypatch.setattr(language, "understand", lambda text: (text, "chat"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": (text, "chat"))
     monkeypatch.setattr(ai, "talk", lambda model, system, messages: asked.append(messages) or "an answer")
     engine = Engine()
     say(engine, "write a poem")
@@ -224,7 +224,7 @@ def test_chat_remembers_the_conversation(power, monkeypatch):
 ])
 def test_pasted_text_is_discussed_and_never_run(power, monkeypatch, pasted):
     monkeypatch.setattr("buddy.agent.run", lambda *a, **k: pytest.fail("the agent ran"))
-    monkeypatch.setattr(language, "understand", lambda text: pytest.fail("it was treated as a command"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": pytest.fail("it was treated as a command"))
     monkeypatch.setattr(ai, "talk", lambda model, system, messages: "Looks fine")
     engine = Engine()
     say(engine, pasted)
@@ -239,7 +239,7 @@ def test_a_long_answer_is_sent_but_not_read_aloud(power, monkeypatch):
         def say(self, text): spoken.append(text)
         def stop(self): pass
 
-    monkeypatch.setattr(language, "understand", lambda text: (text, "chat"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": (text, "chat"))
     monkeypatch.setattr(ai, "talk", lambda model, system, messages: "code " * 100)
     engine = Engine(speaker=Voice())
     say(engine, "write some code", source="local")
@@ -249,7 +249,7 @@ def test_a_long_answer_is_sent_but_not_read_aloud(power, monkeypatch):
 def test_the_chat_model_being_missing_is_explained(power, monkeypatch):
     def missing(*a, **k):
         raise ai.NotReady(ai.INSTALL_HINT)
-    monkeypatch.setattr(language, "understand", lambda text: (text, "chat"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": (text, "chat"))
     monkeypatch.setattr(ai, "talk", missing)
     engine = Engine()
     say(engine, "what is a noun")
@@ -259,7 +259,7 @@ def test_the_chat_model_being_missing_is_explained(power, monkeypatch):
 def test_the_agent_sees_only_a_short_history(power, monkeypatch):
     seen = {}
     monkeypatch.setattr("buddy.agent.run", lambda *a, **k: seen.update(k) or ("Done", None))
-    monkeypatch.setattr(language, "understand", lambda text: (text, "control"))
+    monkeypatch.setattr(language, "understand", lambda text, attached="": (text, "control"))
     engine = Engine()
     engine.recent = [("write a long essay", "word " * 2000)]
     say(engine, "rearrange the icons")

@@ -8,4 +8,4 @@ def no_real_agent(monkeypatch):
         raise AssertionError("a test reached the real agent")
 
     monkeypatch.setattr("buddy.agent.run", refuse)
-    monkeypatch.setattr("buddy.language.understand", lambda text: (text, "control"))
+    monkeypatch.setattr("buddy.language.understand", lambda text, attached="": (text, "control"))

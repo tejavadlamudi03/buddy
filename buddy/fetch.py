@@ -109,6 +109,12 @@ def download(url: str) -> tuple[Path, bool]:
     return target, is_page
 
 
+def save_received(name: str, data: bytes) -> Path:
+    target = _unique(_downloads(), _safe_name(name))
+    target.write_bytes(data)
+    return target
+
+
 def _tool(*command: str) -> None:
     """Runs a converter so that Stop can end it, along with anything it started."""
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

@@ -260,7 +260,7 @@ def test_a_link_the_model_dropped_is_put_back(monkeypatch):
     calls = []
     monkeypatch.setitem(actions.REGISTRY, "download", lambda **args: calls.append(args) or "ok")
     monkeypatch.setattr(engine_module.desktop, "target_window", lambda: None)
-    monkeypatch.setattr(engine_module.language, "understand", lambda text: ("Download this link and send it to me", "control"))
+    monkeypatch.setattr(engine_module.language, "understand", lambda text, attached="": ("Download this link and send it to me", "control"))
     engine = Engine()
     engine.submit("ee link download chesi naaku pampu https://x.com/File.pdf", source="whatsapp")
     _wait(engine)
