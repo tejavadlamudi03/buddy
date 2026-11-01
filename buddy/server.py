@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import actions, config, share, whatsapp
+from . import actions, awake, config, share, whatsapp
 from .engine import Engine
 from .listen import Listener, telugu_ear
 from .stt import Transcriber
@@ -34,6 +34,7 @@ class Settings(BaseModel):
 
 def create_app(engine: Engine | None = None, transcriber: Transcriber | None = None) -> FastAPI:
     settings = config.load()
+    awake.restore()
     engine = engine or Engine(speaker=Speaker())
     telugu = telugu_ear()
     transcriber = transcriber or Listener(Transcriber(settings["whisper_model"]), telugu)

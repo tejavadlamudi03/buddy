@@ -63,7 +63,9 @@ has no actions in this chat, and anything pasted (several lines, or over 300 cha
 ever discussed, so text you paste can't run as a command. It can't look things up online. Messages
 are read up to 12000 characters. The last note is kept at
 `~/.local/share/buddy/last-voice-note.ogg`, overwritten each time, for checking by ear.
-Buddy must be running, the laptop awake, and the laptop signed in to your desktop session.
+Buddy must be running, the laptop awake, and the laptop signed in to your desktop session. Say
+"Stay awake" before you leave. The screen still locks, and it survives a restart of Buddy, but
+keep the laptop plugged in and out of a bag. A laptop that's already asleep can't be woken by message.
 WhatsApp runs hidden with no window; a window only appears for `whatsapp-login`. Opening Buddy
 from the app menu brings its window to the front, and closing that window leaves Buddy running.
 
@@ -85,6 +87,7 @@ from the app menu brings its window to the front, and closing that window leaves
 | "Share my screen", "Share my screen with control", "Stop sharing" | Live screen on your phone |
 | "Minimize", "Maximize", "Close Chrome", "Switch to Files" | Window control |
 | "Lock", "Shut down", "Restart" | Shutdown, restart, suspend and logout ask you to say "yes" |
+| "Stay awake", "Stay awake for 2 hours", "Allow sleep" | Stops the laptop sleeping, even with the lid closed, for 8 hours unless you say otherwise (24 at most) |
 | "Stop" | Cancels whatever is running |
 | "Click Save", "Click Sound", "Click 7", "Double click report", "Read the screen" | Finds that text in the front window with local OCR and clicks it, or presses the control by name through Linux accessibility when OCR can't read it |
 | "Turn off Bluetooth", "Dark mode on", "Brightness 40", "Night light", "Do not disturb", "Battery saver" | System settings |

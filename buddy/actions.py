@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from . import a11y, apps, config, desktop, files, media, ocr, share, whatsapp
+from . import a11y, apps, awake, config, desktop, files, media, ocr, share, whatsapp
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -234,6 +234,18 @@ def reply(text: str) -> str:
 @action
 def tell_time() -> str:
     return f"It's {datetime.now():%-I:%M %p}"
+
+
+@action
+def stay_awake(seconds: int = awake.DEFAULT_SECONDS) -> str:
+    until = awake.start(seconds)
+    return (f"Okay, I'll stay awake until {datetime.fromtimestamp(until):%-I:%M %p}, even with the lid closed. "
+            "Keep me plugged in and out of a bag. Say allow sleep to undo this.")
+
+
+@action
+def allow_sleep() -> str:
+    return "Okay, I can sleep normally again" if awake.stop() else "I wasn't being kept awake"
 
 
 @action
@@ -593,6 +605,8 @@ def system_report() -> str:
     if gpu:
         lines.append(f"GPU {gpu}")
     lines.append(lock_status())
+    if until := awake.until():
+        lines.append(f"Staying awake until {datetime.fromtimestamp(until):%-I:%M %p}")
     windows = [window.title for window in desktop.list_windows() if desktop.BUDDY_TITLE not in window.title]
     lines.append(f"{len(windows)} windows open: " + ", ".join(title[:40] for title in windows[:8]))
     lines.append(now_playing())

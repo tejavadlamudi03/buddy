@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from .apps import SITES, find_app
 
 Step = dict
+NUMBER_WORDS = {word: str(index) for index, word in enumerate(
+    "one two three four five six seven eight nine ten eleven twelve".split(), 1)}
+UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 
 LEAD_IN = re.compile(
     r"^\s*(?:(?:hey|hi|ok|okay|yo)[,\s]+)?(?:(?:buddy|body|birdie)\b[,.!:\s]*)?"
@@ -105,6 +108,8 @@ FIXED.update({
     _LIVE_SCREEN: ("share_screen", {}),
     _LIVE_SCREEN + r"(?: with (?:full )?control| and let me control it)": ("share_screen", {"control": True}),
     r"stop (?:sharing|streaming)(?: my| the)?(?: screen)?": ("stop_sharing", {}),
+    r"(?:allow|let)(?: the| my| this)?(?: laptop| computer| pc| it| yourself)?(?: to)?(?: go to)? sleep(?: again)?|"
+    r"(?:you|it) can(?: go to)? sleep(?: again)?|stop staying awake": ("allow_sleep", {}),
     r"what(?:'s| is) the time|what time is it|tell me the time": ("tell_time", {}),
     r"what(?:'s| is) (?:the date|today'?s date)|what day is (?:it|today)": ("tell_date", {}),
     r"(?:what(?:'s| is) )?(?:the |my )?battery(?: level| status)?|how much battery(?: do i have| is left)?": ("battery", {}),
@@ -155,6 +160,19 @@ class Context:
     last_level: str = "volume"  # what a bare "80 percent" refers to
 
 
+def duration_seconds(words: str) -> int | None:
+    """"2 hours", "half an hour", "one hour 30 minutes". None unless all of it is a length of time."""
+    words = re.sub(r"\b(?:and|a|an)\b", lambda m: "and" if m.group() == "and" else "1", words.lower().strip())
+    words = re.sub(r"\b(?:half 1|half)\s+hour\b", "30 minutes", words)
+    for word, digit in NUMBER_WORDS.items():
+        words = re.sub(rf"\b{word}\b", digit, words)
+    parts = re.findall(r"(\d+(?:\.\d+)?)\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|days?)\b", words)
+    leftover = re.sub(r"(\d+(?:\.\d+)?)\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|days?)\b|\band\b", "", words)
+    if not parts or leftover.strip():
+        return None
+    return round(sum(float(amount) * UNIT_SECONDS[unit[0]] for amount, unit in parts))
+
+
 def clean(text: str) -> str:
     return LEAD_IN.sub("", text.strip()).strip().rstrip(".!?, ").strip()
 
@@ -192,6 +210,15 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
     if match := re.fullmatch(r"(?:type|write(?!\s+(?:me|us|a|an|some|the|my|code|python|java\w*)\b))(?: down| out)?[:,]?\s+(.+)",
                              text, re.I | re.S):
         return [step("type_text", text=match.group(1))]
+    if match := re.fullmatch(
+        r"(?:stay awake|keep(?: the| my| this)?(?: laptop| computer| pc| it| yourself)? awake|"
+        r"(?:don'?t|do not)(?: go to)? sleep)(?: for (.+))?", low,
+    ):
+        if match.group(1) is None:
+            return [step("stay_awake")]
+        seconds = duration_seconds(match.group(1))
+        return [step("stay_awake", seconds=seconds)] if seconds else None
+
     if match := re.fullmatch(r"(?:press|hit)\s+(.+)", low):
         combo = re.sub(r"\s*(?:\+|\bplus\b|\s)\s*", "+", match.group(1).strip())
         combo = combo.replace("page+up", "pageup").replace("page+down", "pagedown")
