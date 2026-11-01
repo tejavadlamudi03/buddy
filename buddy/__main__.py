@@ -1,4 +1,4 @@
-"""Command line entry point: `buddy`, `buddy whatsapp-login`, `buddy install-launcher`, `buddy install-autostart`."""
+"""Command line entry point: `buddy`, `buddy check`, `buddy whatsapp-login`, `buddy install-launcher`, `buddy install-autostart`."""
 import argparse
 import shutil
 import subprocess
@@ -47,6 +47,7 @@ def _show_page(settings: dict, focus: bool = True) -> None:
 def install_launcher() -> None:
     executable = Path(sys.argv[0]).resolve()
     entry = Path.home() / ".local/share/applications/buddy.desktop"
+    entry.parent.mkdir(parents=True, exist_ok=True)
     entry.write_text(
         "[Desktop Entry]\nType=Application\nName=Buddy\nComment=Control this laptop by voice\n"
         f"Exec={executable}\nIcon=audio-input-microphone\nTerminal=false\nCategories=Utility;\n"
@@ -73,7 +74,8 @@ def install_autostart() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="buddy", description="Control your laptop by voice.")
-    parser.add_argument("command", nargs="?", choices=["whatsapp-login", "install-launcher", "install-autostart"])
+    parser.add_argument("command", nargs="?", choices=["whatsapp-login", "install-launcher", "install-autostart", "check", "use-profile"])
+    parser.add_argument("profile", nargs="?", choices=sorted(config.PROFILES), help="with use-profile: which settings to use")
     parser.add_argument("--no-open", action="store_true", help="start the server without opening the page")
     parser.add_argument("--background", action="store_true", help="open the page only if it isn't already open, unfocused")
     parser.add_argument("--url", action="store_true", help="print the private link and exit")
@@ -85,6 +87,14 @@ def main() -> None:
     elif args.command == "whatsapp-login":
         from .whatsapp import login
         login()
+    elif args.command == "use-profile":
+        if not args.profile:
+            parser.error("use-profile needs one of: " + ", ".join(sorted(config.PROFILES)))
+        chosen = config.apply_profile(args.profile)
+        print(chosen.get("ai_model", "") if chosen["agent_enabled"] else "")  # scripts/install.sh reads which model to fetch
+    elif args.command == "check":
+        from .doctor import run
+        sys.exit(1 if run() else 0)
     elif args.command == "install-launcher":
         install_launcher()
     elif args.command == "install-autostart":

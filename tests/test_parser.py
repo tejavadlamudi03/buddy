@@ -169,6 +169,8 @@ def test_settings_pages_and_folders():
 
 
 def test_names_containing_and_still_open_the_app(monkeypatch):
+    installed = {"passwords and keys", "software and updates", "chrome"}  # whatever this machine happens to have
+    monkeypatch.setattr("buddy.parser.find_app", lambda name: name if name.lower() in installed else None)
     assert parse("open passwords and keys")[0]["name"] == "passwords and keys"
     assert parse("open software and updates")[0]["name"] == "software and updates"
     assert parse("open chrome and do something clever") is None

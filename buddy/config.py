@@ -26,6 +26,15 @@ DEFAULTS = {
     "private_folders": [],  # relative to home; added to files.PRIVATE_DIRS. Restart Buddy after changing it
 }
 
+# What suits each kind of laptop, chosen by scripts/install.sh. Any of these can be changed afterwards in the config.
+PROFILES = {
+    "full": {"ai_model": "gemma4:e4b-it-q4_K_M", "ai_context": 12288, "agent_enabled": True,  # 8 GB of video memory
+             "whisper_model": "small.en", "voice_note_model": "medium.en"},
+    "light": {"ai_model": "gemma4:e2b", "ai_context": 8192, "agent_enabled": True,  # a smaller card, or none at all
+              "whisper_model": "base.en", "voice_note_model": "small.en"},
+    "basic": {"agent_enabled": False, "whisper_model": "base.en", "voice_note_model": "small.en"},  # built-in commands only
+}
+
 
 def load() -> dict:
     stored = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
@@ -33,6 +42,12 @@ def load() -> dict:
     if "token" not in config:
         config["token"] = secrets.token_urlsafe(24)
         save(config)
+    return config
+
+
+def apply_profile(name: str) -> dict:
+    config = {**load(), **PROFILES[name], "profile": name}
+    save(config)
     return config
 
 
