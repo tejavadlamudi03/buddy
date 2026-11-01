@@ -18,6 +18,7 @@ PRIVATE_NAMES = (".env", ".env.*", "id_rsa*", "id_ed25519*", "*.pem", "*.key", "
 OPENABLE = ("pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "txt", "md", "png", "jpg",
             "jpeg", "gif", "mp3", "wav", "mp4", "mkv", "avi", "zip", "tar", "gz", "py", "cpp", "yaml", "yml", "json", "html")
 SEARCH_SECONDS = 5
+PARTIAL = (".crdownload", ".part", ".tmp")  # still being downloaded
 MAX_READ_CHARS = 6000
 
 
@@ -97,7 +98,8 @@ def resolve(name: str) -> Path | None:
     """A path as spoken, 'latest', or the best name match."""
     name = spoken_name(name)
     if name.lower() in ("latest", "latest file", "latest download", "last download"):
-        files = [entry for entry in newest(folder_path("downloads"), 50) if entry.is_file()]
+        files = [entry for entry in newest(folder_path("downloads"), 50)
+                 if entry.is_file() and not entry.name.endswith(PARTIAL)]
         return files[0] if files else None
     direct = Path(name).expanduser()
     if direct.is_absolute() and direct.is_file():

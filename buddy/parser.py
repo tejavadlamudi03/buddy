@@ -12,6 +12,10 @@ Step = dict
 NUMBER_WORDS = {word: str(index) for index, word in enumerate(
     "one two three four five six seven eight nine ten eleven twelve".split(), 1)}
 UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+_FORMAT = r"(?:an? )?\.?(?!me\b|my\b|whatsapp\b)([a-z0-9]{2,5})(?: format| file)?"
+_INTO = rf"(?:(?:and )?(?:convert(?: it)? )?(?:to|as|into|in) {_FORMAT})?"
+_AND_SEND = rf"((?:and |then )?send(?: it| that)?(?: to me| me)?(?: (?:as|in) {_FORMAT})?(?: (?:on|to|via|over|through|in)(?: my)? whatsapp)?)?"
+_FILE_WORDS = {"it", "this", "that", "the file", "this file", "that file", "the download", "my download"}
 
 LEAD_IN = re.compile(
     r"^\s*(?:(?:hey|hi|ok|okay|yo)[,\s]+)?(?:(?:buddy|body|birdie)\b[,.!:\s]*)?"
@@ -26,7 +30,8 @@ VERBS = (
     r"change|skip|put on|listen to|share|stream|stop sharing|run|find|list"
 )
 CLAUSE_BREAK = re.compile(rf"\s*(?:,\s*)?(?:\band then\b|\bthen\b|\band\b|,)\s+(?=(?:{VERBS})\b)", re.I)
-TYPING = re.compile(r"^(?:type|write|run)\b", re.I)  # dictated words and commands keep their "and"s
+# Dictated words, commands and links to fetch keep their "and"s.
+TYPING = re.compile(r"^(?:type|write|run|download|convert|export)\b|^(?:fetch|get|save|grab|send me)\b.*https?://", re.I)
 MEDIA_ACTIONS = {"next_track", "previous_track", "pause_media", "resume_media", "now_playing"}
 SONG = r"(?:song|track|video|music)"
 BROWSER_NAMES = {"chrome", "google chrome", "browser", "the browser"}
@@ -173,6 +178,49 @@ def duration_seconds(words: str) -> int | None:
     return round(sum(float(amount) * UNIT_SECONDS[unit[0]] for amount, unit in parts))
 
 
+def _download_step(text: str) -> Step | None:
+    """The link can be anywhere in the sentence, as it often ends up when translated from Telugu."""
+    link = re.search(r"(?:https?://|www\.)\S+", text, re.I)
+    if not link:
+        return None
+    url = link.group()
+    words = " ".join(f"{text[:link.start()]} {text[link.end():]}".replace(":", " ").split())
+    match = re.fullmatch(
+        r"(download|fetch|get|save|grab|send me)(?: me\b)?(?: (?:the|this|that|a)\b)?(?: (?:file|pdf|video|link|page|it)\b)?(?: from\b)?"
+        r"(.*)", words, re.I,
+    )
+    if not match:
+        return None
+    rest = re.fullmatch(rf"{_INTO}\s*{_AND_SEND}", match.group(2).strip(), re.I)
+    if not rest:
+        return None
+    found = {"url": url if url.lower().startswith("http") else f"https://{url}", "action": "download"}
+    if to := rest.group(1) or rest.group(3):
+        found["to"] = to.lower()
+    if rest.group(2) or match.group(1).lower() == "send me":
+        found["send"] = True
+    return found
+
+
+def _convert_step(text: str) -> Step | None:
+    match = re.fullmatch(rf"(?:convert|export)\s+(.+?)\s+(?:to|into|as|in) {_FORMAT}\s*{_AND_SEND}", text, re.I)
+    send = bool(match and match.group(3))
+    wanted = match.group(2) if match else None
+    if not match:  # "send me report.docx as pdf"
+        match = re.fullmatch(rf"send me\s+(.+?)\s+(?:as|in) {_FORMAT}(?: (?:on|to|via|over|through|in)(?: my)? whatsapp)?", text, re.I)
+        if not match:
+            return None
+        send, wanted = True, match.group(2)
+    name = match.group(1).strip(" '\"")
+    if name.lower() in _FILE_WORDS:
+        name = "latest download"
+    name = re.sub(r"^(?:the |my )(?=latest|last)", "", name, flags=re.I)
+    found = {"action": "convert_file", "name": name, "to": wanted.lower()}
+    if send:
+        found["send"] = True
+    return found
+
+
 def clean(text: str) -> str:
     return LEAD_IN.sub("", text.strip()).strip().rstrip(".!?, ").strip()
 
@@ -210,6 +258,10 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
     if match := re.fullmatch(r"(?:type|write(?!\s+(?:me|us|a|an|some|the|my|code|python|java\w*)\b))(?: down| out)?[:,]?\s+(.+)",
                              text, re.I | re.S):
         return [step("type_text", text=match.group(1))]
+    fetched = _download_step(text) or _convert_step(text)
+    if fetched:
+        return [fetched]
+
     if match := re.fullmatch(
         r"(?:stay awake|keep(?: the| my| this)?(?: laptop| computer| pc| it| yourself)? awake|"
         r"(?:don'?t|do not)(?: go to)? sleep)(?: for (.+))?", low,

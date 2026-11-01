@@ -93,6 +93,8 @@ from the app menu brings its window to the front, and closing that window leaves
 | "Turn off Bluetooth", "Dark mode on", "Brightness 40", "Night light", "Do not disturb", "Battery saver" | System settings |
 | "Find report", "List my downloads", "Open report.pdf", "Open file budget" | Your files |
 | "Send me report.pdf", "Send me the latest download" | Sends a file to your WhatsApp |
+| "Download https://example.com/a.pdf", "Download https://example.com/a.docx as pdf and send it to me" | Saves it in Downloads and converts it if you asked. From WhatsApp the file comes back to you |
+| "Convert report.docx to pdf", "Send me the latest download as mp3" | Converts audio, video, pictures, documents, sheets and slides, and zips anything. The original stays |
 | "Report", "How is my laptop" | Battery, memory, disk, Wi-Fi, windows and what's playing |
 | "Run df -h" | Reads the command back, then runs it after "yes" and returns the output |
 | "Open Bluetooth settings", "Open my downloads", "Zoom in", "Snap left", "Next workspace" | Settings pages, folders, windows |
@@ -108,6 +110,13 @@ Press **Share screen to phone** or say "Share my screen", then scan the QR code.
 - Buddy announces aloud when a device connects. If you didn't expect it, say "Stop sharing".
 - Sharing must be started at the laptop, the laptop has to stay awake, each share gets a new
   link, and laptop audio isn't sent.
+
+## Downloads and conversions
+
+Everything arrives in `~/Downloads`. Buddy sends files up to 50 MB to WhatsApp and tells you when one
+is bigger. Only send links you trust: a downloaded file is never run, but converting one does open it in
+ffmpeg or LibreOffice. YouTube and similar sites aren't handled, so a link to one saves just the page.
+"Stop" cancels a download or conversion. Private files can't be converted, because the copy wouldn't be private.
 
 ## Private files
 

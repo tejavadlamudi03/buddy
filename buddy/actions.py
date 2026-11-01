@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from . import a11y, apps, awake, config, desktop, files, media, ocr, share, whatsapp
+from . import a11y, apps, awake, config, desktop, fetch, files, media, ocr, share, whatsapp
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -19,6 +19,7 @@ COMMAND_SECONDS = 120
 MAX_COMMAND_OUTPUT = 3000
 # Never by voice or from the Buddy page: at a lock screen, anyone in the room could say it.
 WHATSAPP_ONLY = {"unlock_screen"}
+SENDS_FILE = {"download", "convert_file"}
 
 
 class UnknownTarget(LookupError):
@@ -565,6 +566,33 @@ def send_file(name: str) -> str:
         return f"{path.name} is too big to send on WhatsApp"
     whatsapp.send_image(_owner_phone(), path)
     return f"Sent {path.name} to your WhatsApp"
+
+
+def _hand_over(path: Path, send: bool, note: str = "") -> str:
+    if not send:
+        return f"{note}Saved {path.name} in {path.parent.name}"
+    if path.stat().st_size > MAX_SEND_BYTES:
+        return (f"{note}Saved {path.name} in {path.parent.name}, but at {path.stat().st_size / 1e6:.0f} MB "
+                f"it's too big to send on WhatsApp. The limit is {MAX_SEND_BYTES // 1000000} MB")
+    whatsapp.send_image(_owner_phone(), path)
+    return f"{note}Sent {path.name} to your WhatsApp"
+
+
+@action
+def download(url: str, to: str = "", send: bool = False) -> str:
+    path, is_page = fetch.download(url)
+    note = "That link is a web page, not a file, so I saved the page. " if is_page else ""
+    return _hand_over(fetch.convert(path, to) if to else path, send, note)
+
+
+@action
+def convert_file(name: str, to: str, send: bool = False) -> str:
+    path = files.resolve(name)
+    if path is None:
+        return f"I couldn't find a file called {name}"
+    if files.is_private(path):  # a copy in Downloads would no longer be private
+        return f"{path.name} is private, so I won't convert it"
+    return _hand_over(fetch.convert(path, to), send)
 
 
 @action

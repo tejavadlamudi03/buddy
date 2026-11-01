@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import actions, agent, ai, config, desktop, language
+from . import actions, agent, ai, config, desktop, fetch, language
 from .language import TELUGU_NO, TELUGU_STOP, TELUGU_YES
 from .parser import Context, clean, parse
 
@@ -22,6 +22,7 @@ RECENT_TURNS = 6
 SPOKEN_LIMIT = 200  # longer answers are shown and sent, not read aloud
 CONFIRM_SECONDS = 30
 PASTED_CHARS = 300  # this long, or several lines: material to discuss, which must never run as commands
+LINK = re.compile(r"https?://\S+")  # download links can be very long, and aren't what makes text pasted
 HISTORY_CHARS = 1500
 AGENT_HISTORY_CHARS = 200  # the agent's context also has to hold the screen
 
@@ -56,6 +57,7 @@ class Engine:
 
     def stop(self, quiet: bool = False) -> None:
         self._stop.set()
+        fetch.cancel.set()
         self.pending = self.resume = None
         if self.speaker:
             self.speaker.stop()
@@ -92,6 +94,7 @@ class Engine:
         self.busy = True
         self._source = source
         self._stop.clear()
+        fetch.cancel.clear()
         threading.Thread(target=self._process, args=(text,), daemon=True).start()
         return True
 
@@ -154,7 +157,7 @@ class Engine:
             return "Okay"
 
         agent_enabled = config.load()["agent_enabled"]
-        if agent_enabled and (len(text) > PASTED_CHARS or "\n" in text):
+        if agent_enabled and (len(LINK.sub("", text)) > PASTED_CHARS or "\n" in text):
             return self._talk(text)
 
         target = desktop.target_window()
@@ -171,6 +174,8 @@ class Engine:
             return unknown or "I didn't understand that"
         self.emit("log", "Not a built-in command, asking the local AI")
         english, kind = language.understand(text)
+        if (links := LINK.findall(text)) and not LINK.search(english):  # the model sometimes writes "this link" instead
+            english = f"{english} {links[0]}"
         if kind == "chat":
             return self._talk(text)
         if english != text:
@@ -216,6 +221,8 @@ class Engine:
         actions_asked = {step["action"] for step in steps}
         if self._source == "whatsapp" and "screenshot" in actions_asked and "whatsapp_send_screenshot" not in actions_asked:
             steps = [*steps, {"action": "whatsapp_send_screenshot"}]  # from a phone, a saved picture is no use
+        if self._source == "whatsapp":  # likewise a file only saved on the laptop
+            steps = [{**step, "send": True} if step["action"] in actions.SENDS_FILE else step for step in steps]
         if not confirmed and any(actions.is_risky(step) for step in steps):
             self.pending, self.pending_since, self.pending_source = steps, time.monotonic(), self._source
             risk = next(actions.risk_of(step) for step in steps if actions.is_risky(step))
