@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import a11y, apps, awake, config, desktop, fetch, files, media, ocr, reminders, share, whatsapp
+from . import a11y, apps, awake, config, desktop, fetch, files, guests, location, media, ocr, reminders, share, whatsapp
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -631,6 +631,22 @@ def send_message(text: str) -> str:
     return "Sent that to your WhatsApp"
 
 
+@action
+def set_voice(style: str) -> str:
+    config.save({**config.load(), "voice_style": style})
+    return "Okay, back to my normal voice" if style == "normal" else f"Okay, this is my {style} voice. How do I sound?"
+
+
+@action
+def share_location(send: bool = True) -> str:
+    phone = _owner_phone() if send else ""  # before looking anything up
+    place = location.find()
+    if not send:  # asked on WhatsApp, so the answer itself goes there
+        return location.message(place)
+    whatsapp.send_text(phone, location.message(place))
+    return f"Sent the laptop's location to your WhatsApp. {place.accuracy}"
+
+
 def _owner_phone() -> str:
     phone = config.load()["whatsapp_phone"]
     if not phone:
@@ -665,6 +681,8 @@ def system_report() -> str:
     lines.append(lock_status())
     if until := awake.until():
         lines.append(f"Staying awake until {datetime.fromtimestamp(until):%-I:%M %p}")
+    if guests.enabled():
+        lines.append(f"WhatsApp guests: {guests.with_access()} with access, {guests.current.waiting() if guests.current else 0} waiting")
     windows = [window.title for window in desktop.list_windows() if desktop.BUDDY_TITLE not in window.title]
     lines.append(f"{len(windows)} windows open: " + ", ".join(title[:40] for title in windows[:8]))
     lines.append(now_playing())

@@ -12,7 +12,8 @@ from . import config
 
 
 def _page_url(settings: dict) -> str:
-    return f"http://localhost:{settings['port']}/#token={settings['token']}"
+    version = int((Path(__file__).parent / "static/index.html").stat().st_mtime)  # a changed page is never taken from Chrome's cache
+    return f"http://localhost:{settings['port']}/?v={version}#token={settings['token']}"
 
 
 def _is_running(settings: dict) -> bool:

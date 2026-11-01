@@ -1,8 +1,10 @@
 """WhatsApp Web, in a Chrome profile kept apart from the main one.
 
 Sends images, and with whatsapp_control on, takes commands from exactly one number.
+With a guest password set, others can also chat with the local AI: see guests.py.
 """
 import base64
+import collections
 import io
 import mimetypes
 import queue
@@ -19,7 +21,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
 
-from . import apps, attachments, config, fetch, language, share
+from . import apps, attachments, config, fetch, guests, language, share
 
 COMPOSER = 'footer div[contenteditable="true"]'
 QR_CODE = 'canvas[aria-label*="scan" i], div[data-ref]'
@@ -116,11 +118,22 @@ UNFOLD_LONG = """
   return folded.length;
 }
 """
-# The open chat's name. Message ids no longer name the sender, so staying in this chat is what
-# guarantees a message came from the owner: it was opened by number, and it's the only one read.
+# The open chat's name. Message ids no longer name the sender, so this is what guarantees a command
+# came from the owner: commands are only ever read in the chat opened by number, under this title.
 CHAT_TITLE = """
 () => (document.querySelector('#main header span[dir="auto"]') || {}).innerText || ''
 """
+# Every chat in the list that's on show. Names come from the title attribute, as text would lose emoji.
+READ_CHATS = """
+() => [...document.querySelectorAll('#pane-side [data-testid="cell-frame-container"]')].map(row => ({
+  name: (row.querySelector('[data-testid="cell-frame-title"] span[title], span[title]') || {title: ''}).title,
+  time: (row.querySelector('[data-testid="chat-list-timestamp"]') || {}).innerText || '',
+  unread: !!row.querySelector('[aria-label*="unread" i], [aria-label*="ungelesen" i], [data-testid="icon-unread-count"]'),
+}))
+"""
+CHAT_ROW = '#pane-side [data-testid="cell-frame-container"]'
+GUEST_VISIT_SECONDS = 10  # between trips to other chats, so the owner's chat gets most of the time
+_LIST_TIME = re.compile(r"\d{1,2}[:.]\d{2}(?:\s*[ap]\.?\s*m\.?)?", re.I)  # today's messages; older ones show a date
 
 # Pasting skips the attach menu, whose markup changes far more often than the composer's.
 PASTE_FILE = """
@@ -322,6 +335,34 @@ def commands_from(rows: list, seen: set, now: datetime | None = None,
     return commands
 
 
+def plain_name(name: str) -> str:
+    """Names without emoji and invisible marks, which WhatsApp shows differently from place to place."""
+    return " ".join(re.sub(r"[^\w+]+", " ", name or "").split()).casefold()
+
+
+def chats_to_open(chats: list, owner: str, now: datetime | None = None) -> list[str]:
+    """Other chats with something new. Older unread chats stay unread, as opening one tells its sender it was seen."""
+    now = now or datetime.now()
+    names = collections.Counter(plain_name(chat.get("name")) for chat in chats)
+    wanted = []
+    for chat in chats:
+        name, moment = plain_name(chat.get("name")), (chat.get("time") or "").strip()
+        if not chat.get("unread") or not name or name == plain_name(owner) or names[name] > 1 or not _LIST_TIME.fullmatch(moment):
+            continue
+        age = age_in_minutes(f"[{moment}", now)
+        if age is not None and age <= MAX_AGE_MINUTES:
+            wanted.append(chat["name"])
+    return wanted
+
+
+def is_one_to_one(rows: list, title: str) -> bool:
+    """Only if every incoming message is plainly from the person the chat is named after. A group never is,
+    and answering in one would reach everybody in it, so anything unclear counts as a group."""
+    senders = [plain_name((row.get("stamp") or "").split("]", 1)[-1].rsplit(":", 1)[0])
+               for row in rows if row.get("kind") == "in" and row.get("stamp")]
+    return bool(senders) and all(sender == plain_name(title) for sender in senders)
+
+
 def _audio_levels(audio: bytes) -> str:
     """Loudness only, for telling silence or a cut-off clip from a recognition problem."""
     try:
@@ -348,6 +389,9 @@ class Bridge:
         self._unsure = None  # (text, heard_at) for a voice note waiting for a yes
         self._retry = None  # a file being read when Chrome went down
         self.heard_clearly = True
+        self.desk = guests.current = guests.Desk(engine)
+        self._guest_seen = {}
+        self._next_guest_visit = 0.0
         threading.Thread(target=self._run, daemon=True).start()
 
     def on_page(self, work) -> None:
@@ -393,6 +437,8 @@ class Bridge:
                 kinds = [row["kind"] for row in page.evaluate(READ_ROWS)]
                 print(f"WhatsApp messages read: {kinds.count('in')} in, {kinds.count('out')} out, "
                       f"{kinds.count('media')} media", flush=True)
+                chats = page.evaluate(READ_CHATS)
+                print(f"WhatsApp chat list: {len(chats)} chats, {sum(chat['unread'] for chat in chats)} unread", flush=True)
                 if _should_announce():
                     _send_text(page, "Buddy is online. Send me a command.")
                 retry, self._retry = self._retry, None
@@ -412,9 +458,63 @@ class Bridge:
                     for row in media:
                         self._handle_media(page, row)
                     self._send_replies(page)
+                    self._serve_guests(page, title)
                     page.wait_for_timeout(POLL_MS)
             finally:
                 context.close()
+
+    def _serve_guests(self, page, owner_title: str) -> None:
+        """Leaves the owner's chat, and always returns by number, which a guest's chat can't pretend to be."""
+        if time.monotonic() < self._next_guest_visit or not guests.enabled():
+            return
+        replies = self.desk.take_replies()
+        names = list(dict.fromkeys([*chats_to_open(page.evaluate(READ_CHATS), owner_title), *replies]))
+        if not names:
+            return
+        self._next_guest_visit = time.monotonic() + GUEST_VISIT_SECONDS
+        try:
+            for name in names:
+                self._visit_guest(page, name, replies.get(name, []), owner_title)
+        finally:
+            if not self._open_chat(page) or not self._title_settles(page, owner_title):
+                raise RuntimeError("couldn't get back to the owner's chat")
+
+    def _title_settles(self, page, title: str) -> bool:
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            if page.evaluate(CHAT_TITLE) == title:
+                return True
+            page.wait_for_timeout(200)
+        return False
+
+    def _visit_guest(self, page, name: str, replies: list, owner_title: str) -> None:
+        wanted = plain_name(name)
+        matches = [index for index, chat in enumerate(page.evaluate(READ_CHATS)) if plain_name(chat.get("name")) == wanted]
+        if len(matches) != 1 or wanted == plain_name(owner_title):  # never a guess about who gets a message
+            self.engine.emit("log", "Couldn't find a guest's chat on WhatsApp, so I didn't answer")
+            return
+        page.locator(CHAT_ROW).nth(matches[0]).click()
+        deadline = time.monotonic() + 8
+        while plain_name(page.evaluate(CHAT_TITLE)) != wanted or not page.locator(COMPOSER).count():
+            if time.monotonic() > deadline:
+                self.engine.emit("log", "A guest's chat didn't open on WhatsApp, so I didn't answer")
+                return
+            page.wait_for_timeout(200)
+        page.wait_for_timeout(500)  # its messages appear just after its title does
+        rows = _read_rows(page)
+        seen = self._guest_seen.setdefault(wanted, set())
+        media = []
+        texts = commands_from(rows, seen, media=media)
+        if (texts or media) and not is_one_to_one(rows, name):
+            return
+        for reply in replies:
+            _send_text(page, reply)
+        for text in texts:
+            if answer := self.desk.receive(name, text):
+                _send_text(page, answer)
+        for row in media:
+            if answer := self.desk.about_file(name):
+                _send_text(page, answer)
 
     def _settled_history(self, page) -> set:
         """Every message already in the chat. History loads gradually, so wait until it stops growing."""

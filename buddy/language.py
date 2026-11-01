@@ -24,7 +24,7 @@ Reply with JSON only: {"language": "english" or "telugu"}"""
 _UNDERSTAND = """You read messages sent to an assistant that can control a laptop and can also chat. They may be in English, in Telugu script, or in Telugu written with English letters.
 Reply with JSON only: {"english": "...", "kind": "control" or "chat"}
 "english": the message in plain English, as a short command if it is one. Keep names of apps, songs and files, and links, exactly as they are.
-"kind": "control" if it needs the laptop: doing something on it, downloading or converting a file, setting or cancelling a reminder or timer, or looking at its screen, windows, files or settings.
+"kind": "control" if it needs the laptop: doing something on it, downloading or converting a file, setting or cancelling a reminder or timer, changing how Buddy's voice sounds (keep the voice they named: funny, robot, giant or normal), sharing its location or saying where it is ("Where is the laptop?" is control), or looking at its screen, windows, files or settings.
 "chat" if it can be answered without the laptop: a question, or a request to write, review, rewrite, translate or explain text or code."""
 
 CHAT_PROMPT = """You are Buddy, a personal assistant chatting with the user, usually over WhatsApp. Help with whatever they ask: answer questions, review or rewrite text, write and explain code, translate, think things through.

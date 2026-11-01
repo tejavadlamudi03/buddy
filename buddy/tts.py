@@ -1,4 +1,5 @@
 """Buddy's voice: neural speech generated and played on this machine."""
+import os
 import queue
 import re
 import subprocess
@@ -7,6 +8,7 @@ import tempfile
 import threading
 import urllib.request
 import wave
+from pathlib import Path
 
 from . import config
 
@@ -16,6 +18,31 @@ TELUGU_VOICE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/te/
 TELUGU_VOICE = "te_IN-venkatesh-medium.onnx"
 TELUGU_SCRIPT = re.compile(r"[ఀ-౿]")
 MARKUP = re.compile(r"[*_`~]")  # WhatsApp formatting in a reply, which shouldn't be read out
+# ffmpeg filters, applied after the speech is made, so they work for every language. {rate} is its sample rate.
+STYLES = {
+    "normal": "",
+    "funny": "asetrate={rate}*1.45,aresample={rate},atempo=0.85",
+    # The effect leaves it much quieter, so it's turned back up, with a limiter to stop it distorting.
+    "robot": "afftfilt=real='hypot(re,im)*sin(0)':imag='hypot(re,im)*cos(0)':win_size=512:overlap=0.75,volume=13dB,alimiter=limit=0.95:level=0",
+    "giant": "asetrate={rate}*0.7,aresample={rate},atempo=1.2",
+}
+STYLE_SECONDS = 30
+
+
+def restyle(path: str, style: str) -> None:
+    """Rewrites the speech in this style. A voice effect isn't worth losing the answer, so failing leaves it as it was."""
+    if not STYLES.get(style):
+        return
+    with wave.open(path, "rb") as wav:
+        rate = wav.getframerate()
+    styled = f"{path}.styled.wav"
+    try:
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", path, "-af", STYLES[style].format(rate=rate), styled],
+                       check=True, capture_output=True, timeout=STYLE_SECONDS)
+        os.replace(styled, path)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"Couldn't apply the {style} voice: {error}", file=sys.stderr)
+        Path(styled).unlink(missing_ok=True)
 
 
 def _voice_path(url: str, voice: str):
@@ -62,6 +89,7 @@ class Speaker:
         with tempfile.NamedTemporaryFile(suffix=".wav") as audio:
             with wave.open(audio.name, "wb") as wav:
                 voice.synthesize_wav(text, wav)
+            restyle(audio.name, config.load()["voice_style"])
             self._player = subprocess.Popen(["pw-play", audio.name], stderr=subprocess.DEVNULL)
             self._player.wait()
 

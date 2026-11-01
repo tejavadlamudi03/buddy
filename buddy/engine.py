@@ -16,7 +16,7 @@ WAKE_ANYWHERE = re.compile(r"\b(?:(?:hey|hi|ok|okay|yo)[,\s]+)?(?:buddy|birdie)\
 STOP = re.compile(rf"(?:buddy[,\s]*)?(?:(?:stop|cancel|abort)(?: it| that| everything)?|{TELUGU_STOP})[.!\s]*", re.I)
 YES = re.compile(rf"(?:buddy[,\s]*)?(?:(?:yes|yeah|yep|confirm|do it|go ahead)(?: please)?|{TELUGU_YES})[.!\s]*", re.I)
 NO = re.compile(rf"(?:buddy[,\s]*)?(?:(?:no|nope|don'?t|do not|never ?mind|not now)(?: thanks| please| do that| it)?|{TELUGU_NO})[.!\s]*", re.I)
-AWAKE_SECONDS = 10
+AWAKE_SECONDS = 15
 FOLLOW_UP_SECONDS = 12
 ANSWER_SECONDS = 60
 RECENT_TURNS = 6
@@ -63,6 +63,7 @@ class Engine:
         self._stop.set()
         fetch.cancel.set()
         self.pending = self.resume = None
+        self.awake_until = 0.0
         if self.speaker:
             self.speaker.stop()
         self.emit("say", "Stopped", quiet)
@@ -251,6 +252,7 @@ class Engine:
             steps = [*steps, {"action": "whatsapp_send_screenshot"}]  # from a phone, a saved picture is no use
         if self._source == "whatsapp":
             steps = [{**step, "send": True} if step["action"] in actions.ANSWER_ON_WHATSAPP else step for step in steps]
+            steps = [{**step, "send": False} if step["action"] == "share_location" else step for step in steps]
         if not confirmed and any(actions.is_risky(step) for step in steps):
             self.pending, self.pending_since, self.pending_source = steps, time.monotonic(), self._source
             risk = next(actions.risk_of(step) for step in steps if actions.is_risky(step))

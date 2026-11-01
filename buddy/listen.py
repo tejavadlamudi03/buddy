@@ -6,6 +6,8 @@ from .engine import NO, STOP, WAKE, WAKE_ANYWHERE, YES
 from .parser import Context, clean, parse
 from .stt import Transcriber, has_speech
 
+WAKE_PHRASE = "Hey Buddy"  # without this hint, an Indian-accented test voice was often heard as "K buddy"
+
 
 def _is_known(english: str) -> bool:
     if not clean(english) or any(words.fullmatch(english) for words in (STOP, YES, NO)):
@@ -40,7 +42,8 @@ class Listener:
         hands_free: speech not yet addressed to Buddy. Without the wake word, Telugu isn't tried, so
         talk and music in the room never reach the slower model. A Telugu sentence keeps that wake word.
         """
-        english, no_speech, confidence = self.english.transcribe_with_confidence(audio)
+        heard = self.english.transcribe_with_confidence(audio, expect=WAKE_PHRASE) if hands_free else self.english.transcribe_with_confidence(audio)
+        english, no_speech, confidence = heard
         unchanged = english, no_speech, confidence
         if self.telugu is None or not english or _is_known(english):
             return unchanged

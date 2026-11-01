@@ -29,12 +29,15 @@ class Transcriber:
     def transcribe(self, audio: bytes) -> str:
         return self.transcribe_with_confidence(audio)[0]
 
-    def transcribe_with_confidence(self, audio: bytes) -> tuple[str, float, float]:
-        """The text, how likely the audio held no speech, and the model's average log probability."""
+    def transcribe_with_confidence(self, audio: bytes, expect: str | None = None) -> tuple[str, float, float]:
+        """The text, how likely the audio held no speech, and the model's average log probability.
+
+        expect: words the speech may well contain, which helps with accents the model finds harder.
+        """
         self.load()
         with self._lock:
             segments, _ = self._model.transcribe(
-                io.BytesIO(audio), language=self.language, beam_size=self.beam_size, vad_filter=self.skip_silence,
+                io.BytesIO(audio), language=self.language, beam_size=self.beam_size, vad_filter=self.skip_silence, hotwords=expect,
                 condition_on_previous_text=False,
             )
             parts = list(segments)

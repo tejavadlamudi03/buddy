@@ -36,7 +36,7 @@ class Ear:
     def transcribe(self, audio):
         return self.transcribe_with_confidence(audio)[0]
 
-    def transcribe_with_confidence(self, audio):
+    def transcribe_with_confidence(self, audio, expect=None):
         self.used += 1
         return self.text, self.no_speech, self.confidence
 
