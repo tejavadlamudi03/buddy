@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Buddy Live</title>
+<style>
+  :root { --bg:#111210; --panel:#1d1e1b; --ink:#eeede8; --muted:#a09d94; --line:#35362f; --accent:#4cb79c; --hot:#ef6f58; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui,sans-serif; min-height:100dvh; display:flex; flex-direction:column; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; }
+  h1 { font-size:16px; margin:0; }
+  #status { color:var(--muted); font-size:13px; }
+  #screen { width:100%; display:block; background:#000; min-height:180px; touch-action:pinch-zoom pan-x pan-y; -webkit-touch-callout:none; user-select:none; }
+  #controls { padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; }
+  button { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font:inherit; min-height:44px; flex:1 1 auto; }
+  input { flex:1 1 60%; min-width:0; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:16px; min-height:44px; }
+  form { display:flex; gap:6px; }
+  form button { flex:0 0 auto; }
+  #talk { background:var(--accent); color:#06130f; border:0; font-weight:600; touch-action:none; }
+  #talk.live { background:var(--hot); }
+  #extend { flex:0 0 auto; min-height:36px; padding:6px 10px; font-size:13px; }
+  #end { color:var(--hot); border-color:var(--hot); flex:0 0 auto; min-height:36px; padding:6px 10px; font-size:13px; }
+  #reply { color:var(--accent); min-height:21px; overflow-wrap:anywhere; white-space:pre-wrap; }
+  .hint { color:var(--muted); font-size:13px; margin:0; padding:10px 12px; }
+  #ended { padding:32px 16px; text-align:center; }
+</style>
+</head>
+<body>
+<header><h1>Buddy Live</h1><span id="status">Connecting…</span><button id="extend" hidden>+1 hour</button><button id="end" hidden>End sharing</button></header>
+<img id="screen" alt="Live view of the laptop screen" draggable="false">
+<p class="hint" id="viewHint" hidden>View only. Pinch to zoom.</p>
+<section id="controls" hidden>
+  <div id="reply" aria-live="polite">Tap to click. Press and hold to right-click. Pinch to zoom.</div>
+  <button id="talk">Hold to talk to Buddy</button>
+  <form id="askForm"><input id="ask" placeholder="Tell Buddy what to do" aria-label="Command for Buddy" autocomplete="off"><button>Go</button></form>
+  <form id="typeForm"><input id="type" placeholder="Type into the laptop" aria-label="Text to type on the laptop" autocomplete="off"><button>Type</button></form>
+  <div class="row">
+    <button data-key="enter">Enter</button><button data-key="backspace">⌫</button><button data-key="esc">Esc</button><button data-key="tab">Tab</button>
+  </div>
+  <div class="row">
+    <button data-scroll="5">Scroll up</button><button data-scroll="-5">Scroll down</button><button data-key="alt+left">Back</button><button data-key="alt+tab">Switch</button>
+  </div>
+</section>
+<section id="ended" hidden><h2>Sharing has ended</h2><p>Ask Buddy to share your screen again for a new link.</p></section>
+<script>
+const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+history.replaceState(null, '', location.pathname); // keep the token out of the address bar
+const $ = id => document.getElementById(id);
+const headers = extra => ({'X-Buddy-Token': token, ...extra});
+const post = (path, body) => fetch(path, {method: 'POST', headers: headers({'Content-Type': 'application/json'}), body: JSON.stringify(body)});
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+let running = true, lastEvent = 0, control = false, secondsLeft = 0, previousUrl = null;
+
+function ended() {
+  running = false;
+  for (const id of ['screen', 'controls', 'viewHint', 'end', 'extend']) $(id).hidden = true;
+  $('ended').hidden = false;
+  $('status').textContent = 'Ended';
+}
+async function frames() {
+  while (running) {
+    try {
+      const response = await fetch('/api/frame', {headers: headers(), cache: 'no-store'});
+      if (response.status === 401) return ended();
+      const url = URL.createObjectURL(await response.blob());
+      $('screen').src = url;
+      await $('screen').decode().catch(() => {});
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      previousUrl = url;
+      $('status').textContent = secondsLeft ? `Live · ${Math.ceil(secondsLeft / 60)} min left` : 'Live';
+    } catch {
+      $('status').textContent = 'Reconnecting…';
+      await sleep(1000);
+    }
+    await sleep(document.hidden ? 1500 : 80);
+  }
+}
+async function events() {
+  while (running) {
+    try {
+      const response = await fetch(`/api/events?after=${lastEvent}`, {headers: headers()});
+      if (response.status === 401) return ended();
+      const data = await response.json();
+      for (const event of data.events) {
+        lastEvent = event.id;
+        if (event.kind === 'report') $('reply').textContent = event.text;
+        if (event.kind === 'say' || event.kind === 'error') {
+          $('reply').textContent = event.text;
+          if (!event.quiet) {
+            speechSynthesis.cancel();
+            speechSynthesis.speak(new SpeechSynthesisUtterance(event.text));
+          }
+        }
+      }
+    } catch {}
+    await sleep(600);
+  }
+}
+
+// Tap clicks, press and hold right-clicks. A moved finger is a pan or zoom, not a click.
+const screen_ = $('screen');
+let press = null;
+const tapAt = (event, right) => {
+  const box = screen_.getBoundingClientRect();
+  post('/api/tap', {x: Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)),
+                    y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)), right});
+};
+screen_.addEventListener('contextmenu', event => event.preventDefault());
+screen_.addEventListener('pointerdown', event => {
+  if (!control) return;
+  const start = {clientX: event.clientX, clientY: event.clientY};
+  press = {start, timer: setTimeout(() => { tapAt(start, true); press = null; }, 600)};
+});
+screen_.addEventListener('pointermove', event => {
+  if (press && Math.hypot(event.clientX - press.start.clientX, event.clientY - press.start.clientY) > 10) {
+    clearTimeout(press.timer);
+    press = null;
+  }
+});
+screen_.addEventListener('pointerup', () => {
+  if (!press) return;
+  clearTimeout(press.timer);
+  tapAt(press.start, false);
+  press = null;
+});
+screen_.addEventListener('pointercancel', () => { if (press) clearTimeout(press.timer); press = null; });
+
+document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => post('/api/key', {combo: button.dataset.key})));
+document.querySelectorAll('[data-scroll]').forEach(button => button.addEventListener('click', () => post('/api/scroll', {amount: Number(button.dataset.scroll)})));
+const onSubmit = (form, input, path) => $(form).addEventListener('submit', event => {
+  event.preventDefault();
+  const text = $(input).value;
+  if (!text.trim()) return;
+  $(input).value = '';
+  post(path, {text});
+});
+onSubmit('askForm', 'ask', '/api/command');
+onSubmit('typeForm', 'type', '/api/type');
+$('extend').addEventListener('click', async () => {
+  const response = await post('/api/extend', {});
+  if (response.ok) secondsLeft = (await response.json()).seconds_left;
+});
+$('end').addEventListener('click', async () => { await post('/api/stop', {}); ended(); });
+
+// Hold to talk: raw samples go up as WAV, for the laptop's Whisper to transcribe.
+let stream = null, context = null, chunks = [], holding = false;
+function toWav(parts, rate) {
+  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const view = new DataView(new ArrayBuffer(44 + length * 2));
+  const text = (offset, value) => [...value].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
+  text(0, 'RIFF'); view.setUint32(4, 36 + length * 2, true); text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, 'data'); view.setUint32(40, length * 2, true);
+  let offset = 44;
+  for (const part of parts) for (const value of part) { view.setInt16(offset, Math.max(-1, Math.min(1, value)) * 32767, true); offset += 2; }
+  return new Blob([view], {type: 'audio/wav'});
+}
+$('talk').addEventListener('pointerdown', async event => {
+  $('talk').setPointerCapture(event.pointerId);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const processor = context.createScriptProcessor(4096, 1, 1);
+    chunks = [];
+    holding = true;
+    processor.onaudioprocess = audio => { if (holding) chunks.push(audio.inputBuffer.getChannelData(0).slice()); };
+    source.connect(processor);
+    processor.connect(context.destination);
+    $('talk').classList.add('live');
+    $('talk').textContent = 'Listening… release to send';
+  } catch (error) { $('reply').textContent = `Microphone blocked: ${error.message}`; }
+});
+const release = async () => {
+  if (!holding) return;
+  holding = false;
+  $('talk').classList.remove('live');
+  $('talk').textContent = 'Hold to talk to Buddy';
+  const rate = context.sampleRate;
+  stream.getTracks().forEach(track => track.stop());
+  context.close();
+  const form = new FormData();
+  form.append('file', toWav(chunks, rate), 'speech.wav');
+  $('reply').textContent = 'Thinking…';
+  await fetch('/api/audio', {method: 'POST', headers: headers(), body: form}).catch(() => { $('reply').textContent = "Couldn't send that"; });
+};
+$('talk').addEventListener('pointerup', release);
+$('talk').addEventListener('pointercancel', release);
+
+(async () => {
+  const response = await fetch('/api/info', {headers: headers()}).catch(() => null);
+  if (!response || !response.ok) return ended();
+  const info = await response.json();
+  control = info.control;
+  lastEvent = info.last_event;
+  secondsLeft = info.seconds_left;
+  setInterval(() => { secondsLeft = Math.max(0, secondsLeft - 1); }, 1000);
+  $('end').hidden = false;
+  if (control) { $('controls').hidden = false; $('extend').hidden = false; events(); } else { $('viewHint').hidden = false; }
+  frames();
+})();
+</script>
+</body>
+</html>

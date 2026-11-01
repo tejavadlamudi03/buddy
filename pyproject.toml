@@ -1,0 +1,34 @@
+[project]
+name = "buddy"
+version = "0.1.0"
+description = "Control your whole Linux laptop by voice"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "faster-whisper>=1.1",
+    "pynput>=1.7",
+    "python-xlib>=0.33",
+    "ewmh>=0.1.6",
+    "mss>=9.0",
+    "pillow>=10.4",
+    "playwright>=1.47",
+    "av>=11,<16",
+    "piper-tts>=1.8.0",
+    "qrcode>=8.2",
+    "rapidocr-onnxruntime>=1.4.4",
+]
+
+[project.scripts]
+buddy = "buddy.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["buddy"]

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buddy Voice Control</title>
+<style>
+  :root { --bg:#f6f5f2; --panel:#fff; --ink:#1d1c1a; --muted:#6e6b65; --line:#e3e0da; --accent:#1f6f5c; --hot:#c8452f; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161614; --panel:#201f1d; --ink:#ecebe7; --muted:#9a968e; --line:#33312d; --accent:#4cb79c; --hot:#ef6f58; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px; display:flex; flex-direction:column; gap:14px; min-height:100vh; }
+  header { display:flex; align-items:center; justify-content:space-between; }
+  h1 { font-size:18px; margin:0; }
+  #status { color:var(--muted); font-size:13px; }
+  #mic { align-self:center; width:128px; height:128px; border-radius:50%; border:0; background:var(--accent); color:#fff; font:600 14px system-ui; cursor:pointer; touch-action:none; margin-top:6px; }
+  #mic.live { background:var(--hot); box-shadow:0 0 0 8px color-mix(in srgb, var(--hot) 25%, transparent); }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row.center { justify-content:center; }
+  button.plain { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:inherit; cursor:pointer; }
+  #stop { color:var(--hot); border-color:var(--hot); font-weight:600; }
+  input[type=text] { flex:1; min-width:0; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:9px 12px; font:inherit; }
+  label.toggle { display:flex; gap:7px; align-items:center; cursor:pointer; }
+  #log { flex:1; min-height:180px; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:5px; }
+  #log div { overflow-wrap:anywhere; }
+  .heard { font-weight:600; margin-top:6px; }
+  .log { color:var(--muted); font-size:13px; }
+  .say { color:var(--accent); }
+  .report { white-space:pre-wrap; font-size:13px; }
+  .error { color:var(--hot); }
+  details { color:var(--muted); font-size:13px; }
+  details .row { margin-top:8px; }
+  #tokenError { color:var(--hot); }
+  #share { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+  #shareLive { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  #shareLive[hidden] { display:none; }
+  #qr { width:132px; height:132px; background:#fff; padding:6px; border-radius:6px; }
+  #shareInfo { flex:1 1 200px; min-width:0; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--muted); }
+  #shareState { color:var(--ink); font-weight:600; font-size:15px; }
+  .between { justify-content:space-between; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Buddy</h1><span id="status">Starting…</span></header>
+  <p id="tokenError" hidden>This link has no valid token. Run <code>buddy --url</code> to get your private link.</p>
+
+  <button id="mic" aria-pressed="false">Hold to talk</button>
+  <div class="row center">
+    <label class="toggle"><input type="checkbox" id="handsFree"> Hands-free: start with “Buddy…”</label>
+    <button class="plain" id="stop">Stop</button>
+  </div>
+
+  <form class="row" id="textForm">
+    <input type="text" id="text" placeholder="Or type a command" aria-label="Command" autocomplete="off">
+    <button class="plain">Run</button>
+  </form>
+
+  <section id="share" aria-label="Share screen to phone">
+    <div class="row between">
+      <label class="toggle"><input type="checkbox" id="shareControl"> Let the phone control this laptop</label>
+      <button class="plain" id="shareToggle">Share screen to phone</button>
+    </div>
+    <div id="shareLive" hidden>
+      <img id="qr" alt="QR code for the private live screen link">
+      <div id="shareInfo">
+        <span id="shareState"></span>
+        <span>Scan with your phone. Anyone with this code can see your screen until it stops.</span>
+        <button class="plain" id="shareCopy">Copy link</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="log" aria-live="polite"></section>
+
+  <details>
+    <summary>Settings</summary>
+    <form class="row" id="settingsForm">
+      <input type="text" id="phone" placeholder="WhatsApp number with country code" aria-label="WhatsApp number" inputmode="tel">
+      <button class="plain">Save</button>
+    </form>
+    <div class="row"><label class="toggle"><input type="checkbox" id="whatsappControl"> Take commands from this number on WhatsApp, and from nobody else</label></div>
+    <div class="row"><label class="toggle"><input type="checkbox" id="agent"> Use the local AI for requests Buddy doesn't know</label></div>
+  </details>
+</main>
+<script>
+const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+const $ = id => document.getElementById(id);
+const api = async (path, options = {}) => {
+  const response = await fetch(path, {...options, headers: {...options.headers, 'X-Buddy-Token': token}});
+  if (response.status === 401) { $('tokenError').hidden = false; throw new Error('bad token'); }
+  return response.json();
+};
+const setStatus = text => { $('status').textContent = text; };
+const addLine = (kind, text) => {
+  const line = document.createElement('div');
+  line.className = kind;
+  line.textContent = text;
+  $('log').append(line);
+  $('log').scrollTop = $('log').scrollHeight;
+};
+
+// Event feed from the server
+let lastEvent = 0, speaking = false;
+async function poll() {
+  try {
+    const {events, busy, speaking: talking} = await api(`/api/events?after=${lastEvent}`);
+    speaking = talking;
+    for (const event of events) {
+      lastEvent = event.id;
+      addLine(event.kind, event.text);
+    }
+    if (!sending) setStatus(busy ? 'Working…' : micStream ? 'Listening' : 'Ready');
+  } catch { setStatus('Not connected'); }
+  setTimeout(poll, 400);
+}
+
+// Microphone. PCM is kept in a rolling buffer so a utterance's first syllable survives
+// the moment it takes to detect speech. ScriptProcessor keeps running when the page is
+// in the background, which timers and animation frames do not.
+const PRE_ROLL_SECONDS = 0.5, SILENCE_SECONDS = 0.9, MIN_SPEECH_SECONDS = 0.3, MAX_SECONDS = 10;
+let micStream = null, audioContext = null, sampleRate = 48000;
+let holding = false, capturing = false, preRoll = [], captured = [], silence = 0, voiced = 0, noiseFloor = 0.005, sending = false;
+
+async function ensureMic() {
+  if (micStream) return;
+  micStream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}});
+  audioContext = new AudioContext();
+  sampleRate = audioContext.sampleRate;
+  const source = audioContext.createMediaStreamSource(micStream);
+  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  processor.onaudioprocess = event => onAudio(event.inputBuffer.getChannelData(0).slice());
+  source.connect(processor);
+  processor.connect(audioContext.destination); // silent output; browsers need the connection to run it
+}
+function dropMic() {
+  micStream?.getTracks().forEach(track => track.stop());
+  audioContext?.close();
+  micStream = audioContext = null;
+}
+function onAudio(chunk) {
+  const seconds = chunk.length / sampleRate;
+  if (holding) { captured.push(chunk); return; }
+  if (!$('handsFree').checked || speaking) return; // Buddy shouldn't hear itself
+
+  const rms = Math.sqrt(chunk.reduce((sum, value) => sum + value * value, 0) / chunk.length);
+  const loud = rms > Math.max(0.012, noiseFloor * 2.5);
+  // Follows quiet quickly and creeps up under steady sound, so music doesn't count as speech forever.
+  noiseFloor = rms < noiseFloor ? noiseFloor * 0.9 + rms * 0.1 : noiseFloor * 1.01;
+  if (!capturing) {
+    preRoll.push(chunk);
+    while (preRoll.length * seconds > PRE_ROLL_SECONDS) preRoll.shift();
+    if (loud) { capturing = true; captured = [...preRoll]; preRoll = []; silence = 0; voiced = 0; $('mic').classList.add('live'); }
+    return;
+  }
+  captured.push(chunk);
+  voiced += loud ? seconds : 0;
+  silence = loud ? 0 : silence + seconds;
+  if (silence >= SILENCE_SECONDS || captured.length * seconds >= MAX_SECONDS) {
+    capturing = false;
+    $('mic').classList.remove('live');
+    const audio = captured;
+    captured = [];
+    if (voiced >= MIN_SPEECH_SECONDS) send(audio, true);
+  }
+}
+function toWav(chunks) {
+  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const view = new DataView(new ArrayBuffer(44 + length * 2));
+  const text = (offset, value) => [...value].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
+  text(0, 'RIFF'); view.setUint32(4, 36 + length * 2, true); text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, 'data'); view.setUint32(40, length * 2, true);
+  let offset = 44;
+  for (const chunk of chunks) for (const value of chunk) {
+    view.setInt16(offset, Math.max(-1, Math.min(1, value)) * 32767, true);
+    offset += 2;
+  }
+  return new Blob([view], {type: 'audio/wav'});
+}
+async function send(chunks, requireWake) {
+  sending = true;
+  setStatus('Transcribing…');
+  const form = new FormData();
+  form.append('file', toWav(chunks), 'speech.wav');
+  try {
+    const result = await api(`/api/audio?require_wake=${requireWake}`, {method: 'POST', body: form});
+    if (!requireWake && !result.text) addLine('log', "I didn't catch that");
+  } catch (error) { addLine('error', `Couldn't process audio: ${error.message}`); }
+  sending = false;
+}
+
+// Hold to talk
+const micButton = $('mic');
+micButton.addEventListener('pointerdown', async event => {
+  micButton.setPointerCapture(event.pointerId);
+  try {
+    await ensureMic();
+    await audioContext.resume();
+    captured = []; capturing = false; holding = true;
+    micButton.classList.add('live');
+    micButton.setAttribute('aria-pressed', 'true');
+  } catch (error) { addLine('error', `Microphone blocked: ${error.message}`); }
+});
+const release = () => {
+  if (!holding) return;
+  holding = false;
+  micButton.classList.remove('live');
+  micButton.setAttribute('aria-pressed', 'false');
+  const audio = captured;
+  captured = [];
+  if (audio.length * 4096 / sampleRate >= MIN_SPEECH_SECONDS) send(audio, false);
+  else addLine('log', 'Hold the button while you speak');
+  if (!$('handsFree').checked) dropMic();
+};
+micButton.addEventListener('pointerup', release);
+micButton.addEventListener('pointercancel', release);
+
+$('handsFree').addEventListener('change', async event => {
+  try { localStorage.setItem('buddyHandsFree', event.target.checked ? '1' : ''); } catch {}
+  try {
+    if (event.target.checked) { await ensureMic(); await audioContext.resume(); }
+    else if (!holding) dropMic();
+  } catch (error) {
+    event.target.checked = false;
+    addLine('error', `Microphone blocked: ${error.message}`);
+  }
+});
+$('stop').addEventListener('click', () => api('/api/stop', {method: 'POST'}));
+
+// Hands-free survives a restart, so Buddy is listening as soon as its window opens.
+try {
+  if (localStorage.getItem('buddyHandsFree')) {
+    $('handsFree').checked = true;
+    ensureMic().then(() => audioContext.resume()).catch(() => { $('handsFree').checked = false; });
+  }
+} catch {}
+
+// Live screen on the phone
+let shareUrl = '', shareActive = false;
+function showShare(share) {
+  shareActive = share.active;
+  $('shareLive').hidden = !share.active;
+  $('shareToggle').textContent = share.active ? 'Stop sharing' : 'Share screen to phone';
+  $('shareToggle').disabled = false;
+  $('shareControl').disabled = share.active;
+  if (!share.active) return;
+  $('shareControl').checked = share.control;
+  if (share.url !== shareUrl) { shareUrl = share.url; $('qr').src = share.qr; }
+  const minutes = Math.ceil(share.seconds_left / 60);
+  $('shareState').textContent = `${share.connected ? 'Phone connected' : 'Waiting for your phone'} · ${share.control ? 'control allowed' : 'view only'} · ${minutes} min left`;
+}
+async function pollShare() {
+  try { showShare(await api('/api/share')); } catch {}
+  setTimeout(pollShare, 2000);
+}
+$('shareToggle').addEventListener('click', async () => {
+  $('shareToggle').disabled = true;
+  if (!shareActive) $('shareToggle').textContent = 'Opening link…';
+  const body = {method: shareActive ? 'DELETE' : 'POST', headers: {'Content-Type': 'application/json'}};
+  if (!shareActive) body.body = JSON.stringify({control: $('shareControl').checked});
+  try { showShare(await api('/api/share', body)); } catch {}
+  $('shareToggle').disabled = false;
+});
+$('shareCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(shareUrl); addLine('log', 'Link copied'); }
+  catch { addLine('error', "Couldn't copy the link"); }
+});
+pollShare();
+$('textForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const text = $('text').value.trim();
+  if (!text) return;
+  $('text').value = '';
+  api('/api/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
+});
+
+// Settings
+const saveSettings = body => api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+$('settingsForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const saved = await saveSettings({whatsapp_phone: $('phone').value});
+  $('phone').value = saved.whatsapp_phone;
+  addLine('log', 'Saved your WhatsApp number');
+});
+$('agent').addEventListener('change', event => saveSettings({agent_enabled: event.target.checked}));
+$('whatsappControl').addEventListener('change', event => saveSettings({whatsapp_control: event.target.checked}));
+api('/api/settings').then(settings => {
+  $('phone').value = settings.whatsapp_phone;
+  $('agent').checked = settings.agent_enabled;
+  $('whatsappControl').checked = settings.whatsapp_control;
+}).catch(() => {});
+
+poll();
+</script>
+</body>
+</html>
