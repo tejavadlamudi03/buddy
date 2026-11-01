@@ -76,12 +76,12 @@ def chat(model: str, system: str, prompt: str, image_jpeg: bytes | None = None, 
     return _post(body, model, timeout)
 
 
-def talk(model: str, system: str, messages: list, timeout: float = 240) -> str:
+def talk(model: str, system: str, messages: list, timeout: float = 240, max_tokens: int = MAX_TALK_TOKENS) -> str:
     """A free-form conversation, rather than the short JSON that chat() asks for."""
     ensure_running()
     body = {
         "model": model, "stream": False, "think": False, "keep_alive": "5m",
-        "options": {"temperature": 0.3, "num_ctx": config.load()["ai_context"], "num_predict": MAX_TALK_TOKENS},
+        "options": {"temperature": 0.3, "num_ctx": config.load()["ai_context"], "num_predict": max_tokens},
         "messages": [{"role": "system", "content": system}, *messages],
     }
     return _post(body, model, timeout)

@@ -124,6 +124,29 @@ FIXED.update({
     r"thanks|thank you(?: very much| so much)?|thanks a lot|good job|well done": ("reply", {"text": "Anytime"}),
 })
 
+LOCATION = (
+    r"(?:share|send)(?: me)?(?: my| the| this| your)?(?: laptop'?s?| computer'?s?)?(?: current| live)? location"
+    r"(?: of (?:the|my|this) (?:laptop|computer))?(?: (?:on|to|via|over|through|in|using|with)(?: me)?(?: on)?(?: my)? (?:whatsapp|phone|mobile))?|"
+    r"where(?:'s| is) (?:the|my|this) (?:laptop|computer)(?: right)?(?: now)?|where am i(?: right)?(?: now)?|"
+    r"tell me where (?:the|my|this) (?:laptop|computer) is|"
+    r"(?:what(?:'s| is)|tell me|show(?: me)?|give me) (?:my|the laptop'?s?|my laptop'?s?)(?: current)? location"
+)
+
+
+VOICE_STYLES = {
+    "funny": "funny", "silly": "funny", "squeaky": "funny", "chipmunk": "funny", "cartoon": "funny",
+    "robot": "robot", "robotic": "robot",
+    "giant": "giant", "deep": "giant", "monster": "giant",
+    "normal": "normal", "regular": "normal", "usual": "normal", "default": "normal", "original": "normal",
+}
+_VOICE_WORD = "(" + "|".join(VOICE_STYLES) + ")"
+VOICE_STYLE = (
+    rf"(?:use|try|switch to|change to|go back to|speak in|speak with|talk in|talk with|give me)(?: a| an| the| your| my)? {_VOICE_WORD} voice|"
+    rf"(?:change|set|switch|make)(?: your| the| my)? voice(?: to| into)?(?: a| an| the)? {_VOICE_WORD}(?: one| voice)?|"
+    rf"(?:talk|speak)(?: like a| like| in a)? {_VOICE_WORD}"
+)
+
+
 def _switch(words: str) -> tuple[str, str]:
     """Every natural way to say turn this on, and to say turn this off."""
     the = r"(?:the |my )?"
@@ -316,6 +339,11 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
         if find_app(target):  # "run chrome" still just opens the app
             return [step("open", name=target, search_fallback=False)]
         return [step("run_command", command=target)]
+
+    if re.fullmatch(LOCATION, low):  # before files, or "send me my location" looks for a file called location
+        return [step("share_location")]
+    if match := re.fullmatch(VOICE_STYLE, low):
+        return [step("set_voice", style=VOICE_STYLES[next(group for group in match.groups() if group)])]
 
     # Files, so "send me report.pdf" isn't mistaken for the WhatsApp screenshot phrases below.
     wants_report = re.fullmatch(r"(?:send|share) me (?:a |my )?(?:system |laptop |status |full )*(?:report|status)", low)

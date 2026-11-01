@@ -17,6 +17,7 @@ English and Telugu. No AI service is involved, and there's no subscription.
 - **Download and convert:** "download this link as a PDF and send it to me". Audio, video, pictures, documents and zip.
 - **Show your screen live on your phone**, view-only or with control, through a browser with no app to install.
 - **Reminders and timers**, delivered on WhatsApp or aloud.
+- **The laptop's location**, sent to your WhatsApp as a Maps link.
 - **English and Telugu**, spoken or typed, including Telugu in English letters ("chrome open cheyyi").
 - **A character with moods:** Buddy listens, thinks, talks, cheers, gets confused and falls asleep. Its eyes follow your pointer, and it reacts when poked.
 
@@ -66,8 +67,13 @@ LibreOffice, Chrome and the accessibility libraries. Everything else stays in th
 Open **Buddy** from the app menu, or run `.venv/bin/buddy`. It starts by itself at every login and restarts after a
 crash, though it can't run until someone has logged in after a reboot.
 
-**Hold Buddy**, or hold the **space bar**, and talk. Or tick Hands-free and begin with "Buddy". Right after a command,
-the next known command works without saying "Buddy". **Esc** cancels what's running.
+**Hold Buddy**, or hold the **space bar**, and talk. Or tick **Listen for "Hey Buddy"**, then say "Hey Buddy" and wait for
+"Yes?", or say it all at once: "Hey Buddy, what time is it". Right after a command, the next known command works without
+saying "Buddy". **Esc** cancels what's running.
+
+"Hey Buddy" works while Buddy's window is open, even minimised, but not once it's closed. It keeps the microphone on and
+transcribes speech on your laptop, and nothing leaves it. It ignores you while the screen is locked, so nobody can give
+commands at a lock screen.
 
 | Say | What happens |
 | --- | --- |
@@ -86,6 +92,8 @@ the next known command works without saying "Buddy". **Esc** cancels what's runn
 | "Remind me in 10 minutes to call home", "Set a timer for 5 minutes" | Tells you when it's time |
 | "What are my reminders", "Cancel the reminder about rent" | Lists or removes them |
 | "Stay awake for 2 hours", "Allow sleep" | Stops the laptop sleeping, even with the lid closed |
+| "Use the funny voice", "Talk like a robot", "Use the giant voice", "Go back to the normal voice" | Changes how Buddy sounds, in English and Telugu. It's also under Settings |
+| "Share my location", "Where is my laptop" | Sends the laptop's location to your WhatsApp as a Maps link, and says how accurate it is |
 | "How is my laptop" | Battery, memory, disk, Wi-Fi, windows and what's playing |
 | "Share my screen", "Share my screen with control", "Stop sharing" | Live screen on your phone |
 | "Run df -h" | Reads the command back, then runs it after "yes" and returns the output |
@@ -108,8 +116,21 @@ documents are read by the local AI, using your caption as the question, and you 
 is saved in Downloads. It reads about 12000 characters of a document, or the first 3 pages of a scan, and says when it stopped.
 Files you ask for are sent up to 50 MB, and bigger ones stay on the laptop.
 
-- Only the chat with your number is read, and only messages under 3 minutes old. Messages sent while Buddy is stopped or
-  restarting are never answered.
+- Commands are read only from the chat with your number, and only messages under 3 minutes old. Messages sent while Buddy
+  is stopped or restarting are never answered.
+
+### Letting other people chat
+
+Set a password under Settings > Other WhatsApp chats. It's off until you do. Anyone who then messages the linked number is
+asked for it once, and after 3 wrong tries they're ignored for an hour. With the password, they can chat with the local AI for
+7 days, by text only, with up to 30 messages an hour. Changing the password signs everyone out.
+
+- **They can only chat.** Their words go only to the model, in a separate conversation, so they can't control the laptop, read
+  your files or see your own chats. Only your number can give commands.
+- **Groups are never answered,** and unread messages older than 3 minutes are left unread.
+- **One answer at a time.** Up to 10 people can wait in line, and each is told their place. Your own requests go first.
+- **Everyone who messages that number gets the password question,** including people you know. Automatic replies to many
+  people could also break WhatsApp's rules and get the account restricted, so use a number you can afford to lose.
 - The laptop must be awake and signed in to your desktop. Say "Stay awake" before you leave, and keep it plugged in and out
   of a bag. A laptop that's already asleep can't be woken by message.
 - "Unlock" works only from your WhatsApp number, after a "yes", because anyone in the room could say it at the lock screen.
@@ -169,6 +190,7 @@ ever target the front window. Known commands need no AI at all, so they're insta
 - **Private files stay private.** Buddy won't find, read, send or convert anything in `.ssh`, `.gnupg`, `.aws`, browser and mail profiles or its own data, or files like `.env` and `*.pem`. Add your own folders under `private_folders` in the config, and restart Buddy. A "run" command you confirm yourself isn't limited by this.
 - **Screen sharing goes through a temporary Cloudflare tunnel.** The link is encrypted, but Cloudflare's servers handle the traffic, and anyone with the link can see your screen until it ends. The tunnel reaches only a small separate server, never Buddy's main token or settings.
 - **Converting opens the file** in `ffmpeg` or LibreOffice, so only use links you trust. A downloaded file is never run.
+- **Your location is looked up only when you ask.** Buddy sends the addresses of nearby Wi-Fi networks and your internet address to [beaconDB](https://beacondb.net/), and the link goes to your own WhatsApp chat. The local AI can't request it. This doesn't use Ubuntu's Location Services, so turning those off doesn't stop it.
 
 ## Settings
 
@@ -188,6 +210,7 @@ They're in `~/.config/buddy/config.json`. Restart Buddy after changing them with
 - Remember you over time. It keeps the last 6 exchanges until it restarts, and the model never learns from you.
 - Look things up online when chatting, so recent facts may be out of date.
 - Send files over 50 MB, download from YouTube and similar sites, or work while the laptop is asleep.
+- Send a WhatsApp location pin or live location, or know where your phone is. It sends a link to where the laptop is at that moment, and where beaconDB doesn't know the nearby Wi-Fi networks, that's only a rough area, up to about 25 km off.
 - Understand languages other than English and Telugu.
 
 ## Tests

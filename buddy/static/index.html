@@ -30,7 +30,7 @@
   #aurora i:nth-child(2) { right:-25vmax; bottom:-30vmax; background:var(--accent2); animation-duration:30s; animation-direction:alternate-reverse; }
   @keyframes drift { to { transform:translate(12vmax,8vmax) scale(1.2); } }
 
-  .app { max-width:1120px; height:100vh; height:100dvh; margin:0 auto; padding:14px 16px; display:grid; gap:12px; grid-template-rows:auto minmax(0,1fr); grid-template-columns:minmax(0,1fr); }
+  .app { height:100vh; height:100dvh; margin:0 auto; padding:14px 16px; display:grid; gap:12px; grid-template-rows:auto minmax(0,1fr); grid-template-columns:minmax(0,1fr); }
   header { display:flex; align-items:center; gap:10px; }
   h1 { font-size:18px; margin:0; letter-spacing:.2px; }
   #status { display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:13px; padding:4px 11px; border-radius:99px; background:var(--panel); border:1px solid var(--line); margin-right:auto; }
@@ -38,10 +38,14 @@
   button.plain { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font:inherit; cursor:pointer; transition:transform .12s,border-color .2s; }
   button.plain:hover { border-color:var(--glow); }
   button.plain:active { transform:scale(.96); }
-  button:focus-visible, input:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #chatToggle { position:relative; display:inline-flex; align-items:center; justify-content:center; }
+  #chatToggle[aria-expanded=true] { color:var(--accent); border-color:var(--accent); }
+  #chatDot { position:absolute; top:-3px; right:-3px; width:11px; height:11px; border-radius:50%; background:var(--hot); border:2px solid var(--bg); }
+  #chatDot[hidden] { display:none; }
   #stop { color:var(--hot); border-color:color-mix(in srgb,var(--hot) 55%,transparent); font-weight:600; }
 
-  .layout { display:grid; gap:12px; min-height:0; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+  .layout { width:100%; max-width:1088px; justify-self:center; display:grid; gap:12px; min-height:0; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
   .stage { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
   #bubble { position:relative; max-width:min(460px,92%); min-height:44px; display:flex; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px 14px; backdrop-filter:blur(12px); text-align:center; transition:opacity .25s,transform .25s; }
   #bubbleText { margin:auto; max-height:92px; overflow:auto; overflow-wrap:anywhere; }
@@ -57,6 +61,9 @@
   label.toggle { display:flex; gap:7px; align-items:center; cursor:pointer; }
 
   .talk { display:flex; flex-direction:column; gap:8px; min-height:0; }
+  .talk[hidden] { display:none; }
+  .layout:not(.chatting) { grid-template-rows:minmax(0,1fr); }
+  .layout:not(.chatting) .stage { justify-content:center; }
   #chips { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; flex:none; }
   #chips button { flex:none; background:none; color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:4px 11px; font:inherit; font-size:13px; cursor:pointer; transition:color .2s,border-color .2s,transform .12s; }
   #chips button:hover { color:var(--ink); border-color:var(--glow); transform:translateY(-1px); }
@@ -69,12 +76,13 @@
   #log .log { color:var(--muted); font-size:12px; }
   #log .error { align-self:flex-start; color:var(--hot); background:color-mix(in srgb,var(--hot) 12%,transparent); padding:6px 11px; border-radius:13px 13px 13px 3px; }
   #empty { margin:auto; color:var(--muted); text-align:center; font-size:14px; }
-  input[type=text] { flex:1; min-width:0; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
+  input[type=text], input[type=password] { flex:1; min-width:0; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
   #tokenError { color:var(--hot); margin:0; }
 
   #panel { position:fixed; z-index:5; top:0; right:0; bottom:0; width:min(380px,100vw); background:var(--solid); border-left:1px solid var(--line); padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; transform:translateX(102%); visibility:hidden; transition:transform .25s ease-out,visibility .25s; }
   #panel.open { transform:none; visibility:visible; }
   #panel h2 { font-size:15px; margin:0; }
+  select { background:var(--solid); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
   .card { border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; font-size:14px; }
   #shareLive { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   #shareLive[hidden] { display:none; }
@@ -84,7 +92,7 @@
   #model { color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
 
   @media (min-width:820px) {
-    .layout { grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
+    .layout.chatting { grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
     .stage { justify-content:center; }
     #mic { width:min(360px,62vh,38vw); }
     #bubbleText { max-height:130px; }
@@ -101,8 +109,12 @@
     <span id="status" role="status">Starting…</span>
     <button class="plain" id="stop" title="Esc">Stop</button>
     <button class="plain" id="panelToggle" aria-expanded="false" aria-controls="panel">Settings</button>
+    <button class="plain" id="chatToggle" aria-label="Chat" title="Chat" aria-expanded="false" aria-controls="talk">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2.4-3.2A8 8 0 1 1 21 12z"/></svg>
+      <span id="chatDot" hidden></span>
+    </button>
   </header>
-  <div class="layout">
+  <div class="layout" id="layout">
     <section class="stage" aria-label="Talk to Buddy">
       <p id="tokenError" hidden>This link has no valid token. Run <code>buddy --url</code> to get your private link.</p>
       <div id="bubble" aria-hidden="true"><span id="bubbleText"></span></div>
@@ -141,11 +153,11 @@
       </button>
       <p id="hint">Hold Buddy, or hold <kbd>Space</kbd>, and talk. Poke for fun.</p>
       <div class="row center">
-        <label class="toggle"><input type="checkbox" id="handsFree"> Hands-free: start with “Buddy…”</label>
+        <label class="toggle"><input type="checkbox" id="handsFree"> Listen for “Hey Buddy”</label>
       </div>
     </section>
 
-    <section class="talk" aria-label="Conversation">
+    <section class="talk" id="talk" aria-label="Conversation" hidden>
       <div id="chips" role="group" aria-label="Things to try">
         <button data-say="What time is it">Time</button>
         <button data-say="How is my laptop">My laptop</button>
@@ -187,6 +199,24 @@
     <label class="toggle"><input type="checkbox" id="whatsappControl"> Take commands from this number, and from nobody else</label>
   </section>
   <section class="card">
+    <strong>Other WhatsApp chats</strong>
+    <span>Set a password, and anyone who messages this WhatsApp number is asked for it. With it, they can chat with the local AI. They can't control this laptop or see your files. Groups are never answered.</span>
+    <form class="row" id="guestForm">
+      <input type="password" id="guestPassword" placeholder="At least 8 characters" aria-label="Password for other chats" autocomplete="new-password">
+      <button class="plain">Save</button>
+    </form>
+    <div class="row" style="justify-content:space-between"><span id="guestStatus">Off</span><button class="plain" id="guestOff" type="button" hidden>Turn off</button></div>
+  </section>
+  <section class="card">
+    <strong><label for="voiceStyle">Buddy's voice</label></strong>
+    <select id="voiceStyle">
+      <option value="normal">Normal</option>
+      <option value="funny">Funny (squeaky)</option>
+      <option value="robot">Robot</option>
+      <option value="giant">Giant (deep)</option>
+    </select>
+  </section>
+  <section class="card">
     <strong>Local AI</strong>
     <label class="toggle"><input type="checkbox" id="agent"> Use the local AI for requests Buddy doesn't know</label>
     <span id="model"></span>
@@ -211,21 +241,27 @@ const addLine = (kind, text) => {
 };
 
 // Event feed from the server
-let lastEvent = 0, speaking = false, busy = false, firstPoll = true, lastSaid = '';
+let lastEvent = 0, speaking = false, busy = false, awake = false, firstPoll = true, lastSaid = '', polling = false, pollTimer = 0, polledAt = 0;
 async function poll() {
+  if (polling) return;
+  polling = true;
+  clearTimeout(pollTimer);
+  polledAt = performance.now();
   try {
     const feed = await api(`/api/events?after=${lastEvent}`);
     speaking = feed.speaking;
     busy = feed.busy;
+    awake = feed.listening && $('handsFree').checked;
     for (const event of feed.events) {
       lastEvent = event.id;
       addLine(event.kind, event.text);
       if (!firstPoll) react(event); // what happened before this page opened is history, not news
     }
     firstPoll = false;
-    if (!sending) setStatus(busy ? 'Working…' : micStream ? 'Listening' : 'Ready');
+    if (!sending) setStatus(busy ? 'Working…' : holding || awake ? 'Listening' : $('handsFree').checked && micStream ? 'Say “Hey Buddy”' : 'Ready');
   } catch { setStatus('Not connected'); }
-  setTimeout(poll, 400);
+  polling = false;
+  pollTimer = setTimeout(poll, 400);
 }
 function react(event) {
   touch();
@@ -237,6 +273,7 @@ function react(event) {
     if (!/^(stopped|sorry|i couldn|i can.t|i didn|still working)/i.test(event.text)) feel('happy', 1500);
   }
   if (event.kind === 'error') { showBubble(event.text); feel('oops', 2600); }
+  if (['say', 'report', 'error'].includes(event.kind) && $('talk').hidden) $('chatDot').hidden = false;
 }
 
 // The speech bubble writes itself out at about the pace of the voice.
@@ -264,9 +301,10 @@ let micLevel = 0, pokes = [], waveUntil = performance.now() + 2200, sparks = [];
 function feel(name, ms) { mood = name; moodUntil = performance.now() + ms; if (name === 'happy') burst(10); }
 function touch() { lastTouch = performance.now(); }
 function currentState(now) {
-  if (holding || capturing) return 'listening';
+  if (holding || (capturing && awake)) return 'listening'; // other sounds in the room aren't worth reacting to
   if (sending || busy) return 'thinking';
   if (speaking) return 'speaking';
+  if (awake) return 'listening';
   if (now < moodUntil) return mood;
   if (now - lastTouch > SLEEP_AFTER_MS) return 'sleeping';
   return 'idle';
@@ -467,7 +505,9 @@ function onAudio(chunk) {
   const rms = Math.sqrt(chunk.reduce((sum, value) => sum + value * value, 0) / chunk.length);
   if (holding || capturing) micLevel = Math.max(micLevel, Math.min(1, rms * 9));
   if (holding) { captured.push(chunk); return; }
-  if (!$('handsFree').checked || speaking) return; // Buddy shouldn't hear itself
+  if (!$('handsFree').checked) return;
+  if (performance.now() - polledAt > 1000) poll(); // minimised, timers slow down, and this must still know when Buddy is talking
+  if (speaking) { capturing = false; captured = []; preRoll = []; $('mic').classList.remove('live'); return; } // Buddy shouldn't hear itself
 
   const loud = rms > Math.max(0.012, noiseFloor * 2.5);
   // Follows quiet quickly and creeps up under steady sound, so music doesn't count as speech forever.
@@ -475,7 +515,7 @@ function onAudio(chunk) {
   if (!capturing) {
     preRoll.push(chunk);
     while (preRoll.length * seconds > PRE_ROLL_SECONDS) preRoll.shift();
-    if (loud) { capturing = true; captured = [...preRoll]; preRoll = []; silence = 0; voiced = 0; $('mic').classList.add('live'); }
+    if (loud) { capturing = true; captured = [...preRoll]; preRoll = []; silence = 0; voiced = 0; $('mic').classList.toggle('live', awake); }
     return;
   }
   captured.push(chunk);
@@ -505,15 +545,16 @@ function toWav(chunks) {
   return new Blob([view], {type: 'audio/wav'});
 }
 async function send(chunks, requireWake) {
-  sending = true;
-  setStatus('Transcribing…');
+  // Sound that may not be meant for Buddy is checked without any fuss, or it would look busy at every noise.
+  const unnoticed = requireWake && !awake;
+  if (!unnoticed) { sending = true; setStatus('Transcribing…'); }
   const form = new FormData();
   form.append('file', toWav(chunks), 'speech.wav');
   try {
     const result = await api(`/api/audio?require_wake=${requireWake}`, {method: 'POST', body: form});
     if (!requireWake && !result.text) { addLine('log', "I didn't catch that"); showBubble("Sorry, I didn't catch that."); feel('oops', 1400); }
   } catch (error) { addLine('error', `Couldn't process audio: ${error.message}`); feel('oops', 2000); }
-  sending = false;
+  if (!unnoticed) sending = false;
 }
 
 // Hold to talk, on Buddy itself or with the space bar
@@ -564,24 +605,16 @@ addEventListener('keyup', event => { if (event.code === 'Space' && !typing(event
 addEventListener('blur', () => release());
 
 $('handsFree').addEventListener('change', async event => {
-  try { localStorage.setItem('buddyHandsFree', event.target.checked ? '1' : ''); } catch {}
   try {
     if (event.target.checked) { await ensureMic(); await audioContext.resume(); }
-    else if (!holding) dropMic();
+    else if (!holding) { dropMic(); capturing = false; captured = []; $('mic').classList.remove('live'); }
   } catch (error) {
     event.target.checked = false;
     addLine('error', `Microphone blocked: ${error.message}`);
   }
+  saveSettings({hey_buddy: event.target.checked}).catch(() => {});
 });
 $('stop').addEventListener('click', () => api('/api/stop', {method: 'POST'}));
-
-// Hands-free survives a restart, so Buddy is listening as soon as its window opens.
-try {
-  if (localStorage.getItem('buddyHandsFree')) {
-    $('handsFree').checked = true;
-    ensureMic().then(() => audioContext.resume()).catch(() => { $('handsFree').checked = false; });
-  }
-} catch {}
 
 // Settings panel
 function togglePanel(open) {
@@ -591,6 +624,18 @@ function togglePanel(open) {
 }
 $('panelToggle').addEventListener('click', () => togglePanel(true));
 $('panelClose').addEventListener('click', () => togglePanel(false));
+
+// The chat stays out of the way until asked for
+$('chatToggle').addEventListener('click', () => {
+  const open = $('talk').hidden;
+  $('talk').hidden = !open;
+  $('layout').classList.toggle('chatting', open);
+  $('chatToggle').setAttribute('aria-expanded', open);
+  if (!open) { micButton.focus(); return; } // so Space goes back to talking, not to reopening the chat
+  $('chatDot').hidden = true;
+  $('log').scrollTop = $('log').scrollHeight; // lines added while hidden couldn't scroll it
+  $('text').focus();
+});
 
 // Live screen on the phone
 let shareUrl = '', shareActive = false;
@@ -645,7 +690,30 @@ $('settingsForm').addEventListener('submit', async event => {
 });
 $('agent').addEventListener('change', event => saveSettings({agent_enabled: event.target.checked}));
 $('whatsappControl').addEventListener('change', event => saveSettings({whatsapp_control: event.target.checked}));
+$('voiceStyle').addEventListener('change', event => runCommand(`use the ${event.target.value} voice`));  // so you hear it straight away
+const showGuests = on => {
+  $('guestStatus').textContent = on ? 'On: others are asked for the password' : 'Off';
+  $('guestOff').hidden = !on;
+};
+$('guestForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const saved = await saveSettings({guest_password: $('guestPassword').value}).catch(error => ({detail: error.message}));
+  $('guestPassword').value = '';
+  if (saved.detail) { $('guestStatus').textContent = saved.detail; return; } // nothing changed
+  showGuests(saved.guests_on);
+  addLine('log', 'Saved the password for other WhatsApp chats');
+});
+$('guestOff').addEventListener('click', async () => showGuests((await saveSettings({guest_password: ''})).guests_on));
 api('/api/settings').then(settings => {
+  showGuests(settings.guests_on);
+  $('voiceStyle').value = settings.voice_style;
+  if (settings.hey_buddy) { // stays on across restarts, so Buddy is listening as soon as its window opens
+    $('handsFree').checked = true;
+    ensureMic().then(() => audioContext.resume()).catch(error => {
+      $('handsFree').checked = false;
+      addLine('error', `Microphone blocked: ${error.message}`);
+    });
+  }
   $('phone').value = settings.whatsapp_phone;
   $('agent').checked = settings.agent_enabled;
   $('whatsappControl').checked = settings.whatsapp_control;

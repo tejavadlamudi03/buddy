@@ -24,6 +24,8 @@ DEFAULTS = {
     "share_port": 8766,
     "share_minutes": 60,
     "private_folders": [],  # relative to home; added to files.PRIVATE_DIRS. Restart Buddy after changing it
+    "voice_style": "normal",  # normal, funny, robot or giant: see tts.STYLES
+    "hey_buddy": False,  # True: the mic stays on while Buddy's window is open, listening for "Hey Buddy"
 }
 
 # What suits each kind of laptop, chosen by scripts/install.sh. Any of these can be changed afterwards in the config.

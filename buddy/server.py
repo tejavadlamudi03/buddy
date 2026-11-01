@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import actions, awake, config, reminders, share, whatsapp
+from . import actions, awake, config, guests, reminders, share, whatsapp
 from .engine import Engine
 from .listen import Listener, telugu_ear
 from .stt import Transcriber
@@ -30,6 +30,19 @@ class Settings(BaseModel):
     whatsapp_phone: str | None = None
     agent_enabled: bool | None = None
     whatsapp_control: bool | None = None
+    hey_buddy: bool | None = None
+    guest_password: str | None = None  # empty turns guests off
+
+
+def hear(engine: Engine, transcriber, audio: bytes, require_wake: bool) -> dict:
+    """require_wake: from always-on listening, so it may not be meant for Buddy at all."""
+    # At a lock screen, anyone in the room could say it. And while talking, this is Buddy hearing itself.
+    if require_wake and (actions.is_locked() or (engine.speaker and engine.speaker.speaking)):
+        return {"text": "", "accepted": False}
+    # Settled on arrival: the window to answer shouldn't close while the answer is being transcribed.
+    unaddressed = require_wake and not engine.listening()
+    text = transcriber.transcribe(audio, hands_free=unaddressed)
+    return {"text": text, "accepted": engine.submit(text, unaddressed)}
 
 
 def create_app(engine: Engine | None = None, transcriber: Transcriber | None = None) -> FastAPI:
@@ -58,7 +71,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
 
     @app.get("/")
     def page():
-        return FileResponse(STATIC / "index.html")
+        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})  # or Chrome keeps showing an old page
 
     @app.post("/api/command", dependencies=guarded)
     def command(body: Command):
@@ -66,8 +79,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
 
     @app.post("/api/audio", dependencies=guarded)
     def audio(file: UploadFile, require_wake: bool = False):
-        text = transcriber.transcribe(file.file.read(), hands_free=require_wake and not engine.listening())
-        return {"text": text, "accepted": engine.submit(text, require_wake)}
+        return hear(engine, transcriber, file.file.read(), require_wake)
 
     @app.post("/api/stop", dependencies=guarded)
     def stop():
@@ -77,7 +89,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.get("/api/events", dependencies=guarded)
     def events(after: int = 0):
         speaking = bool(engine.speaker and engine.speaker.speaking)
-        return {"events": engine.events_after(after), "busy": engine.busy, "speaking": speaking}
+        return {"events": engine.events_after(after), "busy": engine.busy, "speaking": speaking, "listening": engine.listening()}
 
     @app.get("/api/share", dependencies=guarded)
     def share_status():
@@ -99,7 +111,8 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.get("/api/settings", dependencies=guarded)
     def read_settings():
         current = config.load()
-        return {key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control", "ai_model")}
+        return {**{key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control", "ai_model", "voice_style", "hey_buddy")},
+                "guests_on": guests.enabled()}
 
     @app.post("/api/settings", dependencies=guarded)
     def write_settings(body: Settings):
@@ -110,7 +123,14 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
             current["agent_enabled"] = body.agent_enabled
         if body.whatsapp_control is not None:
             current["whatsapp_control"] = body.whatsapp_control
+        if body.hey_buddy is not None:
+            current["hey_buddy"] = body.hey_buddy
+        if body.guest_password is not None:
+            try:
+                guests.set_password(body.guest_password) if body.guest_password else guests.turn_off()
+            except ValueError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from None
         config.save(current)
-        return {key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control")}
+        return {**{key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control")}, "guests_on": guests.enabled()}
 
     return app
