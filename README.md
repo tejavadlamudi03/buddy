@@ -163,10 +163,24 @@ Say "Share my screen", or use Settings, then open the link or scan the code. Not
 
 ## How it works
 
-    mic or WhatsApp -> local Whisper -> rules (parser.py) -> actions.py -> the desktop
-                                            \-> not recognised: the local AI reads it (language.py)
-                                                   a command: rules again, then AI + OCR + screenshot (agent.py)
-                                                   a question or a file: a reply, with no actions
+```mermaid
+flowchart TD
+    mic["Microphone"] --> whisper["Local Whisper<br/>speech to text"]
+    note["WhatsApp voice note"] --> whisper
+    text["WhatsApp or typed text"] --> rules
+    file["WhatsApp photo or document"] --> talk
+    whisper --> rules{"Rules<br/>parser.py"}
+    rules -- "known command" --> actions["Actions<br/>actions.py"]
+    rules -- "not recognised" --> language["Local AI reads it<br/>language.py"]
+    language -- "a question" --> talk["Local AI answers<br/>no actions"]
+    language -- "a command" --> again{"Rules again"}
+    again -- "known command" --> actions
+    again -- "still not known" --> agent["Local AI, OCR and screenshot<br/>agent.py"]
+    agent --> actions
+    actions --> desktop["The desktop<br/>apps, files, media"]
+    actions --> reply["Reply<br/>on the page and aloud, or in the WhatsApp chat"]
+    talk --> reply
+```
 
 Whisper hears, Piper speaks, Linux accessibility and RapidOCR read apps, and an open source model in Ollama thinks. Clicks only
 ever target the front window. Known commands need no AI at all, so they're instant.
