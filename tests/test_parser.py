@@ -100,6 +100,14 @@ def test_asking_for_a_named_song():
         assert parse(phrase) == [{"action": "youtube_play", "query": "believer"}], phrase
 
 
+def test_saying_song_searches_for_music():
+    for phrase in ["play a song pesamale", "play the song pesamale", "play song pesamale", "Play a song, Pesamale",
+                   "play a song pesamale on youtube"]:
+        steps = parse(phrase)
+        assert [step["action"] for step in steps] == ["youtube_play"], phrase
+        assert steps[0]["query"].lower() == "pesamale song", phrase
+
+
 def test_switch_to_still_means_a_window():
     assert parse("switch to files") == [{"action": "focus_window", "name": "files"}]
 

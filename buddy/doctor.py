@@ -3,7 +3,7 @@ import os
 import shutil
 from pathlib import Path
 
-from . import ai, config, files
+from . import ai, config, files, listen
 
 
 def _tools() -> list:
@@ -39,9 +39,11 @@ def run() -> int:
     """How many things are broken. Optional parts that just aren't set up don't count."""
     settings = config.load()
     telugu = Path(settings["telugu_whisper_model"]).exists()
+    wider = listen.languages_ear() is not None
     results = [
         _desktop(), *_tools(), _local_ai(settings),
         (True if telugu else None, "Telugu", "ready" if telugu else "not installed, so English only. Run scripts/install-telugu.sh"),
+        (True if wider else None, "Hindi and German", "ready" if wider else "not installed, so typed only. Run scripts/install-languages.sh"),
         (True if files.HOME.is_dir() else False, "home folder", str(files.HOME)),
         (True if settings["whatsapp_phone"] else None, "WhatsApp number", "set" if settings["whatsapp_phone"] else "not set yet, under Settings"),
         (True if (config.DATA_DIR / "whatsapp-linked").exists() else None, "WhatsApp link",

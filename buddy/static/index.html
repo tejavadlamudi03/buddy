@@ -4,18 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buddy Voice Control</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='23' rx='10' fill='%23eef2f8'/%3E%3Crect x='7' y='9' width='18' height='15' rx='7' fill='%230d1420'/%3E%3Crect x='11' y='13' width='3' height='6' rx='1.5' fill='%235eead4'/%3E%3Crect x='18' y='13' width='3' height='6' rx='1.5' fill='%235eead4'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='17' r='13' fill='%23f6cfa4' stroke='%232a1e14' stroke-width='2'/%3E%3Cpath d='M4 14C4 5 26 3 28 14c-5-5-16-5-24 0z' fill='%232a1e14'/%3E%3Ccircle cx='11' cy='16' r='3.5' fill='%23fff' stroke='%232a1e14'/%3E%3Ccircle cx='21' cy='16' r='4' fill='%23fff' stroke='%232a1e14'/%3E%3Ccircle cx='11' cy='16' r='1.3' fill='%232a1e14'/%3E%3Ccircle cx='21' cy='16' r='1.5' fill='%232a1e14'/%3E%3Cpath d='M9 23q7 4 14-1' fill='none' stroke='%232a1e14' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
-    color-scheme: dark;
-    --bg:#0c1017; --bg2:#121824; --panel:#171e2bcc; --solid:#171e2b; --ink:#eef2f8; --muted:#94a0b3; --line:#ffffff1c;
-    --accent:#5eead4; --accent2:#818cf8; --hot:#fb7185; --warm:#fbbf24; --mine:#2b3a55; --shell1:#f4f7fb; --shell2:#bcc8da; --visor:#0d1420;
-  }
-  @media (prefers-color-scheme: light) { :root {
     color-scheme: light;
-    --bg:#eef2f7; --bg2:#e3e9f2; --panel:#ffffffd9; --solid:#fff; --ink:#172033; --muted:#5a667a; --line:#17203322;
-    --accent:#0d9488; --accent2:#4f46e5; --hot:#e11d48; --warm:#b45309; --mine:#d9e4f5; --shell1:#ffffff; --shell2:#c4d0e2; --visor:#101827;
+    --bg:#fff3d4; --bg2:#ffe6ad; --panel:#fffdf6; --solid:#fffdf6; --ink:#2a1e14; --muted:#6a5540; --line:#2a1e14;
+    --accent:#b93a0c; --accent2:#2456c9; --hot:#c21f1f; --warm:#a85208; --mine:#ffe08a; --dots:#e9b95f66; --spot:#ffd35c; --spot2:#ffc02e;
+    --display:"Comic Neue","Comic Sans MS","Chalkboard SE",Ubuntu,system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    color-scheme: dark;
+    --bg:#211a2e; --bg2:#2b2240; --panel:#352b4d; --solid:#3a2f54; --ink:#fff4dc; --muted:#c7badb; --line:#0d0916;
+    --accent:#ffc247; --accent2:#a9c0ff; --hot:#ff8f7f; --warm:#ffc247; --mine:#54437a; --dots:#ffffff0d; --spot:#f5b93f; --spot2:#e6a324;
   } }
+  /* Plain black, whatever the system's light or dark setting. */
+  :root { color-scheme:dark; --bg:#000; --bg2:#000; --panel:#1b1b1f; --solid:#202025; --ink:#f7f3ea; --muted:#b9b5c0; --line:#3a3a42;
+    --accent:#ffc247; --accent2:#a9c0ff; --hot:#ff8f7f; --warm:#ffc247; --mine:#33333b; --dots:transparent; }
   body[data-state=listening] { --glow:var(--hot); }
   body[data-state=thinking] { --glow:var(--accent2); }
   body[data-state=oops] { --glow:var(--hot); }
@@ -23,37 +27,35 @@
   body[data-state=sleeping] { --glow:var(--muted); }
   * { box-sizing:border-box; }
   html, body { height:100%; }
-  body { --glow:var(--accent); margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; overflow-x:hidden; }
-  #aurora { position:fixed; inset:0; z-index:-1; overflow:hidden; background:linear-gradient(160deg,var(--bg),var(--bg2)); }
-  #aurora i { position:absolute; width:60vmax; height:60vmax; border-radius:50%; filter:blur(90px); opacity:.2; background:var(--glow); transition:background 1s; animation:drift 22s ease-in-out infinite alternate; }
-  #aurora i:nth-child(1) { left:-20vmax; top:-25vmax; }
-  #aurora i:nth-child(2) { right:-25vmax; bottom:-30vmax; background:var(--accent2); animation-duration:30s; animation-direction:alternate-reverse; }
-  @keyframes drift { to { transform:translate(12vmax,8vmax) scale(1.2); } }
-
+  body { --glow:var(--accent); margin:0; color:var(--ink); font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; overflow-x:hidden;
+    background:radial-gradient(var(--dots) 1.5px,transparent 2px) 0 0/16px 16px,linear-gradient(170deg,var(--bg),var(--bg2)) fixed; }
   .app { height:100vh; height:100dvh; margin:0 auto; padding:14px 16px; display:grid; gap:12px; grid-template-rows:auto minmax(0,1fr); grid-template-columns:minmax(0,1fr); }
-  header { display:flex; align-items:center; gap:10px; }
-  h1 { font-size:18px; margin:0; letter-spacing:.2px; }
-  #status { display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:13px; padding:4px 11px; border-radius:99px; background:var(--panel); border:1px solid var(--line); margin-right:auto; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+  h1 { font:700 24px var(--display); margin:0; }
+  #status { display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:13px; padding:4px 11px; border-radius:99px; background:var(--panel); border:2px solid var(--line); margin-right:auto; }
   #status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--glow); box-shadow:0 0 8px var(--glow); transition:background .4s; }
-  button.plain { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font:inherit; cursor:pointer; transition:transform .12s,border-color .2s; }
-  button.plain:hover { border-color:var(--glow); }
-  button.plain:active { transform:scale(.96); }
+  button.plain { background:var(--panel); color:var(--ink); border:2px solid var(--line); border-radius:12px; box-shadow:2px 3px 0 var(--line); padding:7px 12px; font:inherit; font-weight:600; cursor:pointer; transition:transform .1s,box-shadow .1s; }
+  button.plain:hover { transform:translate(-1px,-1px); box-shadow:3px 4px 0 var(--line); }
+  button.plain:active { transform:translate(2px,3px); box-shadow:none; }
+  button.plain:disabled { opacity:.55; cursor:default; }
+  button.go { background:var(--spot); color:#2a1e14; }
   button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   #chatToggle { position:relative; display:inline-flex; align-items:center; justify-content:center; }
-  #chatToggle[aria-expanded=true] { color:var(--accent); border-color:var(--accent); }
+  #chatToggle[aria-expanded=true], #gamesToggle[aria-expanded=true] { background:var(--spot); color:#2a1e14; }
   #chatDot { position:absolute; top:-3px; right:-3px; width:11px; height:11px; border-radius:50%; background:var(--hot); border:2px solid var(--bg); }
   #chatDot[hidden] { display:none; }
-  #stop { color:var(--hot); border-color:color-mix(in srgb,var(--hot) 55%,transparent); font-weight:600; }
+  #stop { color:var(--hot); }
 
   .layout { width:100%; max-width:1088px; justify-self:center; display:grid; gap:12px; min-height:0; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
   .stage { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
-  #bubble { position:relative; max-width:min(460px,92%); min-height:44px; display:flex; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px 14px; backdrop-filter:blur(12px); text-align:center; transition:opacity .25s,transform .25s; }
+  #bubble { position:relative; max-width:min(460px,92%); min-height:48px; display:flex; background:#fffdf6; color:#2a1e14; border:3px solid #2a1e14; border-radius:22px; box-shadow:3px 4px 0 #2a1e14; padding:10px 16px; font:600 16px/1.35 var(--display); text-align:center; transition:opacity .25s,transform .25s; }
   #bubbleText { margin:auto; max-height:92px; overflow:auto; overflow-wrap:anywhere; }
-  #bubble.quiet { opacity:.55; transform:scale(.98); }
-  #bubble::after { content:""; position:absolute; left:50%; bottom:-7px; width:12px; height:12px; margin-left:-6px; background:var(--solid); border-right:1px solid var(--line); border-bottom:1px solid var(--line); transform:rotate(45deg); }
+  #bubble.quiet { opacity:.72; transform:scale(.98); }
+  #bubble::after { content:""; position:absolute; left:50%; bottom:-11px; width:18px; height:18px; margin-left:-9px; background:#fffdf6; border-right:3px solid #2a1e14; border-bottom:3px solid #2a1e14; transform:rotate(45deg) skew(10deg,10deg); }
   #mic { position:relative; display:block; width:min(290px,52vh,74vw); aspect-ratio:1; padding:0; border:0; background:none; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; border-radius:50%; user-select:none; }
   #mic:active { cursor:grabbing; }
-  #ring, #face { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #ring, #face { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  #ring { z-index:1; }
   #hint { margin:0; color:var(--muted); font-size:13px; text-align:center; }
   kbd { font:inherit; font-size:12px; padding:0 5px; border:1px solid var(--line); border-radius:5px; }
   .row { display:flex; gap:8px; align-items:center; }
@@ -64,32 +66,68 @@
   .talk[hidden] { display:none; }
   .layout:not(.chatting) { grid-template-rows:minmax(0,1fr); }
   .layout:not(.chatting) .stage { justify-content:center; }
+  /* Only Buddy in the middle, with the instructions along the bottom. Games need that room, and a narrow chat has nowhere to put them. */
+  body:not(.playing,.choosing,.drawing) .layout:not(.chatting) #hint { position:absolute; left:0; right:0; bottom:38px; }
+  body:not(.playing,.choosing,.drawing) .layout:not(.chatting) .stage > .row.center { position:absolute; left:0; right:0; bottom:4px; }
+  @media (min-width:820px) {
+    body:not(.playing,.choosing,.drawing) #hint { position:absolute; left:0; right:0; bottom:38px; }
+    body:not(.playing,.choosing,.drawing) .stage > .row.center { position:absolute; left:0; right:0; bottom:4px; }
+  }
   #chips { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; flex:none; }
-  #chips button { flex:none; background:none; color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:4px 11px; font:inherit; font-size:13px; cursor:pointer; transition:color .2s,border-color .2s,transform .12s; }
-  #chips button:hover { color:var(--ink); border-color:var(--glow); transform:translateY(-1px); }
-  #log { flex:1; min-height:100px; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:7px; backdrop-filter:blur(12px); }
+  #chips button { flex:none; background:var(--panel); color:var(--ink); border:2px solid var(--line); border-radius:99px; padding:3px 11px; font:inherit; font-size:13px; cursor:pointer; transition:transform .12s; }
+  #chips button:hover { transform:translateY(-1px); }
+  #log { flex:1; min-height:100px; overflow-y:auto; background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:7px; }
   #log div { overflow-wrap:anywhere; animation:rise .22s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(6px); } }
   #log .heard { align-self:flex-end; max-width:85%; background:var(--mine); padding:6px 11px; border-radius:13px 13px 3px 13px; }
-  #log .say, #log .report { align-self:flex-start; max-width:92%; background:color-mix(in srgb,var(--accent) 13%,transparent); padding:6px 11px; border-radius:13px 13px 13px 3px; }
+  #log .say, #log .report { align-self:flex-start; max-width:92%; background:color-mix(in srgb,var(--spot) 30%,transparent); padding:6px 11px; border-radius:13px 13px 13px 3px; }
   #log .report { white-space:pre-wrap; font-size:13px; }
   #log .log { color:var(--muted); font-size:12px; }
   #log .error { align-self:flex-start; color:var(--hot); background:color-mix(in srgb,var(--hot) 12%,transparent); padding:6px 11px; border-radius:13px 13px 13px 3px; }
   #empty { margin:auto; color:var(--muted); text-align:center; font-size:14px; }
-  input[type=text], input[type=password] { flex:1; min-width:0; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
+  input[type=text], input[type=password] { flex:1; min-width:0; background:var(--panel); color:var(--ink); border:2px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
   #tokenError { color:var(--hot); margin:0; }
 
-  #panel { position:fixed; z-index:5; top:0; right:0; bottom:0; width:min(380px,100vw); background:var(--solid); border-left:1px solid var(--line); padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; transform:translateX(102%); visibility:hidden; transition:transform .25s ease-out,visibility .25s; }
+  #panel { position:fixed; z-index:5; top:0; right:0; bottom:0; width:min(380px,100vw); background:var(--solid); border-left:3px solid var(--line); padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; transform:translateX(102%); visibility:hidden; transition:transform .25s ease-out,visibility .25s; }
   #panel.open { transform:none; visibility:visible; }
   #panel h2 { font-size:15px; margin:0; }
-  select { background:var(--solid); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
-  .card { border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; font-size:14px; }
+  select { background:var(--solid); color:var(--ink); border:2px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; }
+  .card { border:2px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; font-size:14px; }
   #shareLive { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   #shareLive[hidden] { display:none; }
   #qr { width:132px; height:132px; background:#fff; padding:6px; border-radius:6px; }
   #shareInfo { flex:1 1 150px; min-width:0; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--muted); }
   #shareState { color:var(--ink); font-weight:600; font-size:14px; }
-  #model { color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+  .small { color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+  #modelProgress { display:flex; flex-direction:column; gap:6px; }
+  #modelProgress[hidden] { display:none; }
+  #modelBar { width:100%; accent-color:var(--accent); }
+  #modelMore summary { cursor:pointer; font-weight:600; }
+  #modelList { display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+  .modelRow { display:flex; gap:8px; align-items:center; justify-content:space-between; border-top:1px solid color-mix(in srgb,var(--ink) 25%,transparent); padding-top:8px; }
+  .modelRow div { min-width:0; display:flex; flex-direction:column; }
+  .modelRow b { overflow-wrap:anywhere; font-size:13.5px; }
+  .fit-good { color:var(--ink); font-weight:600; }
+  .fit-slow { color:var(--warm); }
+  .fit-big { color:var(--hot); }
+  #modelError { color:var(--hot); }
+  #modelError:empty { display:none; }
+
+  #shelf, #gameBar { width:min(560px,100%); }
+  #shelf[hidden], #gameBar[hidden], #pad[hidden] { display:none; }
+  #shelf { display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  #shelf button { display:flex; flex-direction:column; gap:1px; text-align:left; font-weight:400; padding:8px 11px; }
+  #shelf b { font:700 16px var(--display); }
+  #shelf span { color:var(--muted); font-size:12px; line-height:1.3; }
+  #gameBar { display:flex; flex-direction:column; gap:8px; background:var(--panel); border:2px solid var(--line); border-radius:14px; box-shadow:2px 3px 0 var(--line); padding:9px 11px; }
+  #gameTitle { font:700 16px var(--display); }
+  #gameScore { color:var(--muted); font-size:13px; }
+  #gameButtons { display:flex; flex-wrap:wrap; gap:7px; }
+  #gameButtons:empty { display:none; }
+  #pad { display:flex; flex-direction:column; gap:9px; align-items:center; min-width:0; }
+  #sketch { width:min(100%,62vh); aspect-ratio:1; flex:none; background:#fff; border:3px solid #2a1e14; border-radius:14px; box-shadow:3px 4px 0 #2a1e14; touch-action:none; cursor:crosshair; }
+  body.playing #mic, body.choosing #mic { width:min(230px,36vh,60vw); }
+  body.playing #hint, body.choosing #hint { display:none; }
 
   @media (min-width:820px) {
     .layout.chatting { grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
@@ -98,16 +136,18 @@
     #bubbleText { max-height:130px; }
   }
   @media (max-height:640px) and (max-width:819px) { #mic { width:min(190px,40vh); } #hint { display:none; } }
-  @media (prefers-reduced-motion: reduce) { #aurora i, #log div { animation:none; } #bubble, #panel { transition:none; } }
+  @media (max-width:560px) { header button.plain { padding:6px 9px; } h1 { font-size:20px; } }
+  @media (max-width:819px) { .layout.chatting { grid-template-rows:auto minmax(0,1fr); } body.drawing #sketch { width:min(100%,44vh); } body.drawing #mic { width:min(130px,20vh); } body.drawing .layout { overflow-y:auto; grid-template-rows:auto auto; align-content:start; } }
+  @media (prefers-reduced-motion: reduce) { #log div { animation:none; } #bubble, #panel, button.plain { transition:none; } }
 </style>
 </head>
 <body data-state="idle">
-<div id="aurora" aria-hidden="true"><i></i><i></i></div>
 <div class="app">
   <header>
     <h1>Buddy</h1>
     <span id="status" role="status">Starting…</span>
     <button class="plain" id="stop" title="Esc">Stop</button>
+    <button class="plain" id="gamesToggle" aria-expanded="false" aria-controls="shelf">Games</button>
     <button class="plain" id="panelToggle" aria-expanded="false" aria-controls="panel">Settings</button>
     <button class="plain" id="chatToggle" aria-label="Chat" title="Chat" aria-expanded="false" aria-controls="talk">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2.4-3.2A8 8 0 1 1 21 12z"/></svg>
@@ -122,38 +162,107 @@
         <canvas id="ring" width="600" height="600"></canvas>
         <svg id="face" viewBox="0 0 300 300" aria-hidden="true">
           <defs>
-            <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--shell1)"/><stop offset="1" style="stop-color:var(--shell2)"/></linearGradient>
-            <radialGradient id="visorShine" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#2a3a57"/><stop offset=".7" style="stop-color:var(--visor)"/></radialGradient>
-            <filter id="neon" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="soft"/><feMerge><feMergeNode in="soft"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <clipPath id="clipEyeL"><circle cx="122" cy="93" r="21"/></clipPath>
+            <clipPath id="clipEyeR"><circle cx="179" cy="92" r="24"/></clipPath>
+            <clipPath id="clipMouth"><path id="mouthClip"/></clipPath>
           </defs>
-          <ellipse id="shadow" cx="150" cy="268" rx="66" ry="9" fill="#000" opacity=".22"/>
-          <g id="whole">
-            <g id="handL"><rect x="48" y="196" width="26" height="42" rx="13" fill="url(#shell)"/></g>
-            <g id="handR"><rect x="226" y="196" width="26" height="42" rx="13" fill="url(#shell)"/></g>
-            <path d="M112 212 h76 a18 18 0 0 1 18 18 v10 a14 14 0 0 1 -14 14 h-84 a14 14 0 0 1 -14 -14 v-10 a18 18 0 0 1 18 -18z" fill="url(#shell)"/>
-            <circle id="heart" cx="150" cy="234" r="6" style="fill:var(--glow)" filter="url(#neon)"/>
-            <g id="head">
-              <line x1="150" y1="50" x2="150" y2="26" stroke="#9aa8bd" stroke-width="5" stroke-linecap="round"/>
-              <circle id="tip" cx="150" cy="22" r="8" style="fill:var(--glow)" filter="url(#neon)"/>
-              <rect id="earL" x="34" y="108" width="18" height="52" rx="9" style="fill:var(--glow)" filter="url(#neon)"/>
-              <rect id="earR" x="248" y="108" width="18" height="52" rx="9" style="fill:var(--glow)" filter="url(#neon)"/>
-              <rect x="46" y="46" width="208" height="176" rx="70" fill="url(#shell)"/>
-              <rect x="66" y="68" width="168" height="132" rx="54" fill="url(#visorShine)"/>
-              <ellipse id="cheekL" cx="92" cy="160" rx="13" ry="8" fill="#fb7185" opacity="0"/>
-              <ellipse id="cheekR" cx="208" cy="160" rx="13" ry="8" fill="#fb7185" opacity="0"/>
-              <g style="color:#5eead4" filter="url(#neon)">
-                <g id="eyeL"><rect id="eyeLBall" fill="currentColor"/><path id="eyeLHappy" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0"/></g>
-                <g id="eyeR"><rect id="eyeRBall" fill="currentColor"/><path id="eyeRHappy" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0"/></g>
-                <path id="mouth" fill="#0a0f18" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse id="shadow" cx="150" cy="282" rx="66" ry="7" fill="#2a1e14" opacity=".25"/>
+            <g id="banana" opacity="0"><path d="M70 277q22 10 44-6-8 18-26 18t-18-12z" fill="#ffe14d" stroke="#2a1e14" stroke-width="3"/></g>
+            <g id="toon">
+              <path id="legLo" stroke="#2a1e14" stroke-width="22"/><path id="legRo" stroke="#2a1e14" stroke-width="22"/>
+              <path id="legL" stroke="#4b4038" stroke-width="16"/><path id="legR" stroke="#4b4038" stroke-width="16"/>
+              <g id="shoeL"><path d="M-13 -7q-7 0-7 8t8 8h13q9 0 9-6 0-9-13-10z" fill="#1e1610" stroke="#2a1e14" stroke-width="3" transform="scale(-1 1)"/></g>
+              <g id="shoeR"><path d="M-13 -7q-7 0-7 8t8 8h13q9 0 9-6 0-9-13-10z" fill="#1e1610" stroke="#2a1e14" stroke-width="3"/></g>
+              <path d="M117 190q33 13 66 0l15 9q7 30 3 55-50 9-102 0-4-25 3-55z" fill="#8a5a2b" stroke="#2a1e14" stroke-width="4"/>
+              <path d="M128 192l22 44 22-44q-22 9-44 0z" fill="#fffdf6" stroke="#2a1e14" stroke-width="3"/>
+              <g id="tie"><path d="M144 200h12l-2 7 5 26-9 12-9-12 5-26z" fill="#c9302c" stroke="#2a1e14" stroke-width="3"/></g>
+              <path d="M128 192l-10 18 16 11 16 15M172 192l10 18-16 11-16 15" stroke="#2a1e14" stroke-width="3"/>
+              <path d="M112 215l7 2M107 238l8-1M186 233l7 3M184 212l8-2M126 247l6-2M173 248l7-1" stroke="#6b4420" stroke-width="2.5"/>
+              <circle cx="151" cy="247" r="2.6" fill="#2a1e14"/>
+              <g id="head">
+                <ellipse cx="78" cy="108" rx="11" ry="18" fill="#f6cfa4" stroke="#2a1e14" stroke-width="4"/>
+                <ellipse cx="222" cy="108" rx="11" ry="18" fill="#f6cfa4" stroke="#2a1e14" stroke-width="4"/>
+                <path d="M150 24c50 0 72 38 70 84-2 50-32 82-70 82s-68-32-70-82c-2-46 20-84 70-84z" fill="#f6cfa4" stroke="#2a1e14" stroke-width="4"/>
+                <path d="M192 168c-12 14-26 20-42 20 22 0 42-18 54-42z" fill="#e8b98a"/>
+                <path d="M82 92c-8-50 26-76 72-76 48 0 74 32 64 78-5-22-17-36-38-40-22-5-40 1-58 2-20 2-32 14-40 36z" fill="#2c211a" stroke="#2a1e14" stroke-width="4"/>
+                <path d="M122 57c8-12 22-19 39-21" stroke="#584536" stroke-width="3"/>
+                <ellipse id="cheekL" cx="98" cy="128" rx="13" ry="8" fill="#f0836f" opacity="0" stroke="none"/>
+                <ellipse id="cheekR" cx="202" cy="128" rx="13" ry="8" fill="#f0836f" opacity="0" stroke="none"/>
+                <g id="eyeL">
+                  <circle cx="122" cy="93" r="21" fill="#fffdf6"/>
+                  <g clip-path="url(#clipEyeL)"><g id="pupilL"><circle r="8.5" fill="#2a1e14"/><circle cx="3" cy="-3" r="2.6" fill="#fffdf6"/></g><rect id="lidL" x="96" width="52" fill="#f6cfa4"/><line id="lidLineL" x1="96" x2="148" stroke="#2a1e14" stroke-width="3.5"/></g>
+                  <circle cx="122" cy="93" r="21" stroke="#2a1e14" stroke-width="4"/>
+                </g>
+                <g id="eyeR">
+                  <circle cx="179" cy="92" r="24" fill="#fffdf6"/>
+                  <g clip-path="url(#clipEyeR)"><g id="pupilR"><circle r="9.5" fill="#2a1e14"/><circle cx="3" cy="-3" r="2.9" fill="#fffdf6"/></g><rect id="lidR" x="150" width="58" fill="#f6cfa4"/><line id="lidLineR" x1="150" x2="208" stroke="#2a1e14" stroke-width="3.5"/></g>
+                  <circle cx="179" cy="92" r="24" stroke="#2a1e14" stroke-width="4"/>
+                </g>
+                <path id="shutEyeL" d="M103 94q19 10 38 0" stroke="#2a1e14" stroke-width="5" opacity="0"/>
+                <path id="shutEyeR" d="M157 93q22 11 44 0" stroke="#2a1e14" stroke-width="5" opacity="0"/>
+                <path id="smileEyeL" d="M102 97q20-22 40 0" stroke="#2a1e14" stroke-width="6" opacity="0"/>
+                <path id="smileEyeR" d="M157 97q22-24 44 0" stroke="#2a1e14" stroke-width="6" opacity="0"/>
+                <path id="browL" d="M-20 4q19-14 40-2" stroke="#2a1e14" stroke-width="9"/>
+                <path id="browR" d="M-22 2q21-13 44 2" stroke="#2a1e14" stroke-width="9"/>
+                <g id="nose"><path d="M144 104c-7 13-14 22-10 30 4 9 25 9 30 0 4-7-5-17-10-30z" fill="#f0bd8d" stroke="#2a1e14" stroke-width="3.5"/><path d="M143 126q2 3 6 3" stroke="#fff3df" stroke-width="3"/></g>
+                <path id="mouth" fill="#6e1a22" stroke="#2a1e14" stroke-width="4"/>
+                <g clip-path="url(#clipMouth)">
+                  <rect id="teeth" x="96" width="108" height="11" fill="#fffdf6"/>
+                  <ellipse id="tongue" cx="150" rx="16" ry="10" fill="#e8606b"/>
+                </g>
+                <path id="lick" d="M-12 0q0 22 12 22t12-22z" fill="#e8606b" stroke="#2a1e14" stroke-width="3" opacity="0"/>
+                <path id="sweat" d="M214 58q9 12 0 17-9-5 0-17z" fill="#7cc8ee" stroke="#2a1e14" stroke-width="2.5" opacity="0"/>
+                <g id="stars" opacity="0" font-size="24" fill="#ffe14d" stroke="#2a1e14" stroke-width="1.5" text-anchor="middle" style="font-family:system-ui">
+                  <text id="star1">★</text><text id="star2">★</text><text id="star3">★</text>
+                </g>
               </g>
+              <path id="armLo" stroke="#2a1e14" stroke-width="20"/><path id="armRo" stroke="#2a1e14" stroke-width="20"/>
+              <path id="armL" stroke="#8a5a2b" stroke-width="13"/><path id="armR" stroke="#8a5a2b" stroke-width="13"/>
+              <g id="handL"><circle r="11.5" fill="#f6cfa4" stroke="#2a1e14" stroke-width="3.5"/><path d="M5-9q9-3 9 3t-6 5" fill="#f6cfa4" stroke="#2a1e14" stroke-width="3"/></g>
+              <g id="handR"><circle r="11.5" fill="#f6cfa4" stroke="#2a1e14" stroke-width="3.5"/><path d="M-5-9q-9-3-9 3t6 5" fill="#f6cfa4" stroke="#2a1e14" stroke-width="3"/></g>
             </g>
+            <g id="thought" opacity="0">
+              <circle cx="228" cy="62" r="4" fill="#fffdf6" stroke="#2a1e14" stroke-width="2.5"/>
+              <circle cx="240" cy="48" r="6" fill="#fffdf6" stroke="#2a1e14" stroke-width="2.5"/>
+              <path d="M240 34c-10-3-11-17 1-18 3-11 21-11 25-2 12-2 19 12 8 18 2 11-14 15-20 8-5 4-12 2-14-6z" fill="#fffdf6" stroke="#2a1e14" stroke-width="3"/>
+              <text id="thoughtMark" x="258" y="33" text-anchor="middle" fill="#2a1e14" stroke="none" font-size="20" font-weight="800" style="font-family:system-ui">?</text>
+            </g>
+            <g id="snore" fill="#2a1e14" stroke="none" font-weight="800" style="font-family:system-ui" opacity="0"><text x="222" y="62" font-size="24">z</text><text x="243" y="40" font-size="18">z</text><text x="258" y="24" font-size="13">z</text></g>
+            <g id="notes" fill="#2a1e14" stroke="none" font-size="24" style="font-family:system-ui" opacity="0"><text x="34" y="74">♪</text><text x="248" y="96">♫</text></g>
           </g>
-          <g id="snore" style="fill:var(--muted);font:700 22px system-ui" opacity="0"><text x="226" y="60">z</text><text x="246" y="38" font-size="16">z</text></g>
         </svg>
       </button>
-      <p id="hint">Hold Buddy, or hold <kbd>Space</kbd>, and talk. Poke for fun.</p>
+      <p id="hint">Hold Buddy, or hold <kbd>Space</kbd>, and talk. Poke his nose, tummy or toes for fun.</p>
+      <div id="shelf" role="group" aria-label="Choose a game" hidden>
+        <button class="plain" data-say="play 20 questions"><b>20 Questions</b><span>Think of something. Buddy works it out.</span></button>
+        <button class="plain" data-say="play guess my secret"><b>Guess My Secret</b><span>Buddy thinks of something. You work it out.</span></button>
+        <button class="plain" data-say="play riddles"><b>Riddles</b><span>Five new riddles, made up on the spot.</span></button>
+        <button class="plain" data-say="play story time"><b>Story Time</b><span>Write a silly story, a line each.</span></button>
+        <button class="plain" data-say="play adventure"><b>Adventure</b><span>You choose what happens next.</span></button>
+        <button class="plain" data-say="play hangman"><b>Hangman</b><span>Guess the word, letter by letter.</span></button>
+        <button class="plain" data-say="play word chain"><b>Word Chain</b><span>Each word starts where the last one ended.</span></button>
+        <button class="plain" data-say="play draw and guess"><b>Draw and Guess</b><span>You draw. Buddy looks and guesses.</span></button>
+      </div>
+      <div id="gameBar" hidden>
+        <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span id="gameTitle"></span><span id="gameScore"></span></div>
+        <div id="gameButtons" role="group" aria-label="Quick answers"></div>
+        <form class="row" id="gameForm">
+          <input type="text" id="gameText" placeholder="Say it, or type your answer" aria-label="Your answer" autocomplete="off">
+          <button class="plain">Send</button>
+        </form>
+      </div>
       <div class="row center">
         <label class="toggle"><input type="checkbox" id="handsFree"> Listen for “Hey Buddy”</label>
+      </div>
+    </section>
+
+    <section id="pad" aria-label="Drawing pad" hidden>
+      <canvas id="sketch" width="512" height="512" aria-label="Draw here"></canvas>
+      <div class="row center">
+        <button class="plain" id="padUndo" type="button">Undo</button>
+        <button class="plain" id="padClear" type="button">Clear</button>
+        <button class="plain go" id="padGuess" type="button">Guess it, Buddy!</button>
       </div>
     </section>
 
@@ -165,10 +274,12 @@
         <button data-say="What are my reminders">Reminders</button>
         <button data-say="Take a screenshot">Screenshot</button>
         <button data-say="Tell me a joke">A joke</button>
+        <button data-say="Do a dance">Dance</button>
+        <button data-say="Make a funny face">Funny face</button>
       </div>
       <section id="log" aria-live="polite"><p id="empty">What you say and what I answer will show up here.</p></section>
       <form class="row" id="textForm">
-        <input type="text" id="text" placeholder="Or type here, in English or Telugu" aria-label="Command" autocomplete="off">
+        <input type="text" id="text" placeholder="Or type here, in English, Telugu, Hindi or German" aria-label="Command" autocomplete="off">
         <button class="plain">Send</button>
       </form>
     </section>
@@ -219,7 +330,24 @@
   <section class="card">
     <strong>Local AI</strong>
     <label class="toggle"><input type="checkbox" id="agent"> Use the local AI for requests Buddy doesn't know</label>
-    <span id="model"></span>
+    <span id="laptop" class="small"></span>
+    <label for="modelChoice" class="small">Model in use</label>
+    <select id="modelChoice"></select>
+    <span id="model" class="small"></span>
+    <span id="modelError" class="small" role="alert"></span>
+    <div id="modelProgress" hidden>
+      <span id="modelProgressText" class="small"></span>
+      <progress id="modelBar" max="1" value="0"></progress>
+      <button class="plain" id="modelCancel" type="button">Cancel</button>
+    </div>
+    <details id="modelMore">
+      <summary>Download another model</summary>
+      <div id="modelList"></div>
+      <form class="row" id="modelForm">
+        <input type="text" id="modelName" placeholder="Any name from ollama.com/library" aria-label="Model name" autocomplete="off" spellcheck="false">
+        <button class="plain">Download</button>
+      </form>
+    </details>
   </section>
 </aside>
 <script>
@@ -241,7 +369,7 @@ const addLine = (kind, text) => {
 };
 
 // Event feed from the server
-let lastEvent = 0, speaking = false, busy = false, awake = false, firstPoll = true, lastSaid = '', polling = false, pollTimer = 0, polledAt = 0;
+let lastEvent = 0, speaking = false, busy = false, awake = false, firstPoll = true, lastSaid = '', polling = false, pollTimer = 0, polledAt = 0, game = null;
 async function poll() {
   if (polling) return;
   polling = true;
@@ -252,9 +380,10 @@ async function poll() {
     speaking = feed.speaking;
     busy = feed.busy;
     awake = feed.listening && $('handsFree').checked;
+    showGame(feed.game);
     for (const event of feed.events) {
       lastEvent = event.id;
-      addLine(event.kind, event.text);
+      if (event.kind !== 'mood') addLine(event.kind, event.text);
       if (!firstPoll) react(event); // what happened before this page opened is history, not news
     }
     firstPoll = false;
@@ -263,14 +392,27 @@ async function poll() {
   polling = false;
   pollTimer = setTimeout(poll, 400);
 }
+// A brighter screen is too bright for him, so on go the sunglasses.
+let shadesUntil = 0, lastBrightness = 50;
+function shadesFor(text) {
+  const level = text.match(/^brightness (\d+) percent/i);
+  const brighter = level ? +level[1] > lastBrightness : /^dark mode\b.*\boff\b/i.test(text);
+  if (level) lastBrightness = +level[1];
+  if (brighter) {
+    shadesUntil = performance.now() + 15000;
+    setTimeout(() => showBubble('Whoa, too bright!'), 1600);
+  } else if (level || /^dark mode\b.*\bon\b/i.test(text)) shadesUntil = 0;
+}
 function react(event) {
   touch();
+  if (event.kind === 'mood') { startGag(event.text); return; }
   if (event.kind === 'heard') showBubble(`“${event.text}”`, true);
   if (event.kind === 'say' || event.kind === 'report') {
     showBubble(event.text);
+    shadesFor(event.text);
     lastSaid = event.text;
     say(event.text);
-    if (!/^(stopped|sorry|i couldn|i can.t|i didn|still working)/i.test(event.text)) feel('happy', 1500);
+    if (!game && !gag && !/^(stopped|sorry|i couldn|i can.t|i didn|still working)/i.test(event.text)) feel('happy', 1500);
   }
   if (event.kind === 'error') { showBubble(event.text); feel('oops', 2600); }
   if (['say', 'report', 'error'].includes(event.kind) && $('talk').hidden) $('chatDot').hidden = false;
@@ -292,14 +434,16 @@ function showBubble(text, instantly = false) {
   }, 60);
 }
 
-// Buddy's face. Everything eases towards a target, so moods blend instead of snapping.
+// The character. Everything eases towards a target, so moods blend instead of snapping.
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SLEEP_AFTER_MS = 3 * 60 * 1000;
-const face = {lookX:0, lookY:0, open:1, mouthOpen:0, wide:.6, smile:.5, tilt:0, hop:0, happy:0, ears:0, squash:0, cheek:0, snore:0, lean:0};
+const REST = {lookX:0, lookY:0, open:1, pop:0, shut:0, mouthOpen:.03, wide:.45, smile:.5, side:0, tilt:0, lean:0, happy:0, cheek:0, browL:0, browR:0, worry:0,
+  lick:0, sweat:0, handLx:90, handLy:252, handRx:210, handRy:252, footL:0, footR:0, lift:0, sway:0, squash:0, thought:0, snore:0, notes:0, stars:0, banana:0};
+const toon = {...REST};
 let pointer = {x:0, y:0}, moodUntil = 0, mood = '', lastTouch = performance.now(), blinkAt = 2000, winkUntil = 0, wiggleUntil = 0, dizzyUntil = 0;
-let micLevel = 0, pokes = [], waveUntil = performance.now() + 2200, sparks = [];
+let micLevel = 0, pokes = [], waveUntil = performance.now() + 2200, sparks = [], gag = null, nextIdleGag = performance.now() + 9000;
 function feel(name, ms) { mood = name; moodUntil = performance.now() + ms; if (name === 'happy') burst(10); }
-function touch() { lastTouch = performance.now(); }
+function touch() { lastTouch = performance.now(); nextIdleGag = Math.max(nextIdleGag, lastTouch + 7000); }
 function currentState(now) {
   if (holding || (capturing && awake)) return 'listening'; // other sounds in the room aren't worth reacting to
   if (sending || busy) return 'thinking';
@@ -323,20 +467,100 @@ function lips(now) {
   return MOUTH[letter] || [.35, .6];
 }
 
-const ease = (name, target, rate = .14) => { face[name] += (target - face[name]) * rate; };
+// Silly bits of business. Each runs for ms, adjusting the pose as p goes from 0 to 1.
+// lines are said in the bubble at those points, but only when nobody is being answered.
+const hands = (t, lx, ly, rx, ry) => { t.handLx = lx; t.handLy = ly; t.handRx = rx; t.handRy = ry; };
+const GAGS = {
+  watch: {ms:2800, play(t, p, now) { t.handLx = 134; t.handLy = 212; t.lookX = -.3; t.lookY = 1; t.browR = -12; t.smile = .1; t.footR = Math.abs(Math.sin(now / 130)) * 6; }, lines:[[.15, 'Hmm. Is it time yet?']]},
+  scratch: {ms:2300, play(t, p, now) { t.handRx = 206 + Math.sin(now / 55) * 5; t.handRy = 50 + Math.cos(now / 55) * 4; t.tilt = 7; t.browL = -12; t.browR = 6; t.lookX = -.6; t.lookY = -.8; t.smile = 0; t.side = .5; }},
+  yawn: {ms:2600, play(t, p) { const big = Math.sin(Math.min(1, p * 1.2) * Math.PI); t.mouthOpen = big * 1.3; t.wide = .45; t.smile = 0; t.shut = big > .25 ? 1 : 0; t.handLx = 140; t.handLy = big > .3 ? 170 : 252; t.handRx = 226; t.handRy = 150 + (1 - big) * 100; t.tilt = -4 * big; t.browL = t.browR = -8 * big; }},
+  peek: {ms:3400, play(t, p) { const side = p < .5 ? -1 : 1; t.lookX = side; t.lookY = 0; t.open = .55; t.sway = side * -9; t.lean = side * -3; t.browL = t.browR = 7; t.smile = .15; t.side = side; t.wide = .4; hands(t, 118, 240, 182, 240); t.footL = 2; }, lines:[[.1, 'Did somebody say something?']]},
+  face: {ms:2500, play(t, p, now) { t.browL = -22; t.browR = 12; t.pop = .3; t.lookX = Math.sin(now / 160) * .7; t.lookY = .7; t.mouthOpen = .35; t.wide = .85; t.smile = .4; t.side = -.9; t.lick = 1; t.tilt = Math.sin(now / 140) * 7; hands(t, 62, 108 + Math.sin(now / 80) * 7, 238, 108 - Math.sin(now / 80) * 7); }},
+  sneeze: {ms:2700, play(t, p, now) {
+    if (p < .62) { const build = p / .62; t.tilt = -8 * build; t.sway = -4 * build; t.shut = build > .5 ? 1 : 0; t.mouthOpen = .35 + build * .6; t.wide = .35; t.browL = t.browR = -16 * build; t.lookY = -1; hands(t, 112, 212, 188, 212); }
+    else { const hit = p < .72; t.tilt = hit ? 15 : 3; t.sway = hit ? 7 : 0; t.squash = hit ? .9 : 0; t.shut = hit ? 1 : 0; t.mouthOpen = hit ? 1.15 : .05; t.wide = hit ? .7 : .45; t.smile = hit ? 0 : -.1; t.sweat = hit ? 0 : 1; if (hit && !this.blown) { this.blown = true; burst(14, 300, 340); } }
+  }, lines:[[.04, 'Ah…'], [.28, 'Ah… ahh…'], [.62, 'CHOO!']]},
+  slip: {ms:3400, play(t, p, now) {
+    t.banana = p < .9 ? 1 : 0;
+    if (p < .2) { t.lookY = 1; t.lookX = -.7; t.smile = .4; t.sway = (.2 - p) * 80; t.footL = Math.abs(Math.sin(now / 90)) * 9; }
+    else if (p < .36) { const fall = (p - .2) / .16; t.lean = -40 * fall; t.sway = 36 * fall; t.footR = 28 * fall; t.pop = .6; t.mouthOpen = 1; t.wide = .35; t.smile = -.2; hands(t, 72, 118, 228, 118); }
+    else if (p < .72) { t.lean = -40 + Math.abs(Math.sin((p - .36) * 26)) * 6; t.sway = 36; t.footR = 18; t.stars = 1; t.mouthOpen = .1; t.smile = -.3; t.side = .6; t.open = .7; hands(t, 100, 232, 216, 200); }
+    else { const up = Math.max(0, 1 - (p - .72) / .18); t.lean = -40 * up; t.sway = 36 * up; t.smile = .5; t.lookX = .6; t.browL = -6; if (p > .85) { t.handRx = 196; t.handRy = 200; t.side = .5; } }
+  }, lines:[[.26, 'Whoops!'], [.82, 'Meant to do that.']]},
+  dance: {ms:4200, play(t, p, now) { const beat = Math.sin(now / 160), step = beat > 0; t.happy = 1; t.smile = 1; t.wide = 1; t.mouthOpen = .45; t.cheek = .5; t.notes = 1; t.sway = beat * 13; t.lean = beat * 8; t.tilt = -beat * 7; t.lift = Math.abs(beat) * 11; t.footL = step ? beat * 15 : 0; t.footR = step ? 0 : -beat * 15; hands(t, step ? 58 : 94, step ? 118 : 214, step ? 208 : 244, step ? 212 : 118); }},
+  cheer: {ms:2300, play(t, p, now) { t.happy = 1; t.smile = 1; t.wide = 1; t.mouthOpen = .75; t.cheek = .6; t.lift = Math.abs(Math.sin(now / 150)) * 22; hands(t, 64, 72 + Math.sin(now / 75) * 8, 236, 72 - Math.sin(now / 75) * 8); t.browL = t.browR = -14; }, start() { burst(22); }},
+  sulk: {ms:2600, play(t) { t.tilt = 5; t.lookX = -.5; t.lookY = 1; t.open = .65; t.smile = -1; t.wide = .4; t.worry = 1; t.browL = t.browR = 3; t.side = .3; hands(t, 138, 256, 162, 256); t.squash = .2; }},
+  shock: {ms:1700, play(t, p, now) { t.pop = 1; t.mouthOpen = 1.2; t.wide = .32; t.smile = -.15; t.browL = t.browR = -24; t.lift = p < .25 ? 22 : 0; t.sweat = 1; hands(t, 96, 148, 204, 148); t.sway = p < .25 ? Math.sin(now / 25) * 3 : 0; }},
+  flex: {ms:2400, play(t, p, now) { hands(t, 44, 118 + Math.sin(now / 120) * 4, 256, 118 - Math.sin(now / 120) * 4); t.smile = .9; t.wide = .9; t.mouthOpen = .18; t.browL = -8; t.browR = -14; t.lookX = p < .5 ? -.7 : .7; t.tilt = p < .5 ? -5 : 5; }, lines:[[.1, 'Gym every day!']]},
+  oops: {ms:1600, play(t) { t.worry = 1; t.smile = -.6; t.wide = .65; t.side = .8; t.browL = -8; t.browR = -16; t.lookX = -.4; t.lookY = .5; t.tilt = -6; t.sweat = 1; hands(t, 74, 192, 226, 192); }},
+};
+function startGag(name) {
+  const script = GAGS[name];
+  if (!script) return;
+  if (calm) { feel(['cheer', 'dance'].includes(name) ? 'happy' : 'oops', 1400); return; }
+  gag = {name, script, started:performance.now(), said:0};
+  script.blown = false;
+  script.start?.();
+}
+const IDLE_GAGS = ['watch', 'scratch', 'peek', 'yawn', 'face', 'sneeze', 'slip', 'flex', 'scratch', 'watch', 'flex'];
+function runGag(t, state, now) {
+  if (state === 'idle' && !gag && !calm && !game && now > nextIdleGag) {
+    startGag(IDLE_GAGS[Math.floor(Math.random() * IDLE_GAGS.length)]);
+    nextIdleGag = now + 11000 + Math.random() * 14000;
+  }
+  if (!gag) return;
+  const p = (now - gag.started) / gag.script.ms;
+  if (p >= 1 || state === 'listening' || state === 'thinking') { gag = null; return; }
+  gag.script.play(t, p, now);
+  const lines = gag.script.lines || [];
+  while (gag.said < lines.length && p >= lines[gag.said][0]) {
+    if (state === 'idle' && $('bubble').classList.contains('quiet')) { showBubble(lines[gag.said][1], true); $('bubble').classList.add('quiet'); }
+    gag.said++;
+  }
+}
+
+function poseFor(state, now) {
+  const t = {...REST, lookX:pointer.x, lookY:pointer.y};
+  const sway = calm ? 0 : Math.sin(now / 900);
+  t.handLx += sway * 2; t.handRx -= sway * 2;
+  if (state === 'listening') { t.pop = .18; t.mouthOpen = .1 + micLevel * .3; t.wide = .3; t.smile = .2; t.lean = 3; t.tilt = 7; t.browL = -6; t.browR = -18; t.lookX *= .3; t.lookY *= .3; t.handRx = 233; t.handRy = 112; t.handLy = 244; }
+  if (state === 'thinking') { const tap = calm ? 0 : Math.sin(now / 150) * 2; t.open = .78; t.smile = .05; t.side = .5; t.wide = .32; t.lookX = Math.sin(now / 620) * .7 + .25; t.lookY = -1; t.browL = 3; t.browR = -15; t.tilt = -4 + (calm ? 0 : Math.sin(now / 900) * 2); t.handRx = 168; t.handRy = 178 + tap; t.handLx = 134; t.handLy = 226; t.thought = 1; }
+  if (state === 'speaking') { [t.mouthOpen, t.wide] = lips(now); t.smile = .45; t.lookX *= .4; t.lookY *= .4; t.browL = t.browR = -6 + Math.sin(now / 420) * 5; if (!calm) { t.tilt = Math.sin(now / 700) * 3; t.handRx = 216; t.handRy = 224 + Math.sin(now / 240) * 13; t.handLx = 86 - Math.sin(now / 310) * 5; t.handLy = 238 + Math.sin(now / 310) * 7; } }
+  if (state === 'happy') { t.happy = 1; t.smile = 1; t.wide = 1; t.mouthOpen = .4; t.cheek = .55; t.browL = t.browR = -10; if (!calm) { t.lift = Math.abs(Math.sin(now / 170)) * 13; hands(t, 74, 150 + Math.sin(now / 90) * 8, 226, 150 - Math.sin(now / 90) * 8); } }
+  if (state === 'oops') { GAGS.oops.play(t); }
+  if (state === 'sleeping') { t.shut = 1; t.smile = .1; t.wide = .28; t.mouthOpen = .1 + .08 * Math.sin(now / 1100); t.tilt = 9; t.side = .3; t.lookX = t.lookY = 0; t.browL = t.browR = 4; t.snore = 1; t.lift = -2; }
+  if (now < waveUntil && !calm && state !== 'listening') { t.handRx = 244 + Math.sin(now / 110) * 15; t.handRy = 118; t.browL = -10; }
+  if (now < wiggleUntil && !calm) { t.tilt += Math.sin(now / 38) * 9; t.happy = 1; t.smile = 1; t.cheek = .6; t.mouthOpen = .5; t.wide = 1; t.handLx = 122; t.handLy = 226; t.handRx = 178; t.handRy = 226; }
+  if (now < shadesUntil) { t.smile = Math.max(t.smile, .85); t.wide = .85; t.tilt += 3; }
+  if (now < dizzyUntil) { t.stars = 1; t.smile = -.2; t.side = .7; t.sway += calm ? 0 : Math.sin(now / 180) * 7; t.lean += calm ? 0 : Math.sin(now / 240) * 4; }
+  runGag(t, state, now);
+  return t;
+}
+
 const set = (id, attribute, value) => $(id).setAttribute(attribute, value);
-function drawEye(side, cx, cy, now) {
+const place = (id, x, y, turn = 0) => set(id, 'transform', `translate(${x} ${y}) rotate(${turn})`);
+function hose(id, x1, y1, x2, y2, bend) {
+  const path = `M${x1} ${y1}Q${(x1 + x2) / 2 + bend} ${(y1 + y2) / 2 + Math.abs(bend) * .45} ${x2} ${y2}`;
+  set(id, 'd', path); set(`${id}o`, 'd', path);
+}
+function drawEye(side, cx, cy, radius, now) {
   const dizzy = now < dizzyUntil;
-  const x = cx + face.lookX * 11 + (dizzy ? Math.cos(now / 90 + (side === 'L' ? 0 : 3)) * 6 : 0);
-  const y = cy + face.lookY * 8 + (dizzy ? Math.sin(now / 90 + (side === 'L' ? 0 : 3)) * 6 : 0);
+  const x = cx + toon.lookX * radius * .45 + (dizzy ? Math.cos(now / 90 + (side === 'L' ? 0 : 3)) * radius * .4 : 0);
+  const y = cy + toon.lookY * radius * .42 + (dizzy ? Math.sin(now / 90 + (side === 'L' ? 0 : 3)) * radius * .4 : 0);
+  place(`pupil${side}`, x, y);
   const winking = side === 'R' && now < winkUntil;
-  const height = Math.max(3, 40 * (winking ? .06 : face.open));
-  set(`eye${side}Ball`, 'x', x - 14); set(`eye${side}Ball`, 'width', 28);
-  set(`eye${side}Ball`, 'y', y - height / 2); set(`eye${side}Ball`, 'height', height);
-  set(`eye${side}Ball`, 'rx', Math.min(14, height / 2));
-  set(`eye${side}Ball`, 'opacity', 1 - face.happy);
-  set(`eye${side}Happy`, 'd', `M${x - 16} ${y + 7} Q${x} ${y - 17} ${x + 16} ${y + 7}`);
-  set(`eye${side}Happy`, 'opacity', face.happy);
+  const open = Math.max(0, Math.min(1, winking ? 0 : toon.open * (1 - toon.shut)));
+  const lidEdge = cy - radius - 2 + (radius * 2 + 4) * (1 - open);
+  set(`lid${side}`, 'y', cy - radius - 4); set(`lid${side}`, 'height', Math.max(0, lidEdge - cy + radius + 4));
+  set(`lidLine${side}`, 'y1', lidEdge); set(`lidLine${side}`, 'y2', lidEdge);
+  set(`lidLine${side}`, 'opacity', open > .97 ? 0 : 1);
+  const grow = 1 + toon.pop * .3;
+  set(`eye${side}`, 'transform', `translate(${cx} ${cy}) scale(${grow}) translate(${-cx} ${-cy})`);
+  const smiling = toon.happy > .5 && !winking;
+  const shut = !smiling && open < .14;
+  set(`eye${side}`, 'opacity', smiling || shut ? 0 : 1);
+  set(`shutEye${side}`, 'opacity', shut ? 1 : 0);
+  set(`smileEye${side}`, 'opacity', smiling ? 1 : 0);
 }
 function drawFace(now) {
   const state = currentState(now);
@@ -344,106 +568,100 @@ function drawFace(now) {
     document.body.dataset.state = state;
     $('bubble').classList.toggle('quiet', state === 'idle' || state === 'sleeping');
   }
-  let open = 1, mouthOpen = .03, wide = .6, smile = .5, tilt = 0, happy = 0, cheek = 0, lean = 0;
-  let lookX = pointer.x, lookY = pointer.y;
-  if (state === 'listening') { open = 1.12; mouthOpen = .12 + micLevel * .3; wide = .35; smile = .25; lean = 1; lookX *= .3; lookY *= .3; }
-  if (state === 'thinking') { open = .8; smile = .1; wide = .35; lookX = Math.sin(now / 520) * .9; lookY = -.7; tilt = 4 * Math.sin(now / 900); }
-  if (state === 'speaking') { [mouthOpen, wide] = lips(now); smile = .45; lookX *= .4; lookY *= .4; tilt = Math.sin(now / 700) * 1.6; }
-  if (state === 'happy') { happy = 1; smile = 1; wide = 1; mouthOpen = .35; cheek = .55; }
-  if (state === 'oops') { open = .7; smile = -.8; wide = .55; tilt = -7; lookY = .5; lookX = -.3; }
-  if (state === 'sleeping') { open = .04; smile = .15; wide = .3; mouthOpen = .08 + .06 * Math.sin(now / 1100); tilt = 5; lookX = lookY = 0; }
+  const t = poseFor(state, now);
   // A blink every few seconds, so it never looks frozen.
   if (now > blinkAt + 120) blinkAt = now + 2200 + Math.random() * 4200;
-  if (now > blinkAt && state !== 'sleeping') open = Math.min(open, .08);
-  if (now < wiggleUntil) { tilt += Math.sin(now / 38) * 9; cheek = .6; happy = 1; smile = 1; }
+  if (now > blinkAt && state !== 'sleeping') t.open = Math.min(t.open, .05);
+  const quick = new Set(['open', 'shut', 'mouthOpen', 'wide', 'pop', 'lift', 'footL', 'footR']);
+  for (const name in REST) {
+    if (name === 'squash' && t.squash === 0) { toon.squash += (0 - toon.squash) * .16; continue; }
+    toon[name] += (t[name] - toon[name]) * (name.startsWith('hand') ? .2 : name === 'lean' || name === 'sway' ? .17 : quick.has(name) ? .3 : .14);
+  }
 
-  ease('open', open, .3); ease('mouthOpen', mouthOpen, .34); ease('wide', wide, .22); ease('smile', smile);
-  ease('tilt', tilt); ease('happy', happy, .2); ease('cheek', cheek, .1); ease('lean', lean);
-  ease('lookX', lookX, .12); ease('lookY', lookY, .12); ease('snore', state === 'sleeping' ? 1 : 0, .05);
-  ease('ears', state === 'listening' ? micLevel : 0, .4);
-  ease('squash', 0, .16);
+  const breathe = calm ? 0 : Math.sin(now / (state === 'sleeping' ? 1700 : 900)) * (state === 'sleeping' ? 1.5 : 1.8);
+  const sx = 1 + toon.squash * .14, sy = 1 - toon.squash * .16 + breathe * .004;
+  set('toon', 'transform', `translate(${150 + toon.sway} ${280 - toon.lift}) rotate(${toon.lean}) scale(${sx} ${sy}) translate(-150 -280)`);
+  set('head', 'transform', `translate(0 ${breathe * .6}) rotate(${toon.tilt} 150 182)`);
+  set('tie', 'transform', `rotate(${-toon.lean * .5 + toon.sway * .7 + (toon.lift > 4 ? Math.sin(now / 60) * 7 : 0)} 150 200)`);
+  set('shadow', 'rx', Math.max(30, 66 - toon.lift * .9 - Math.abs(toon.lean) * .3)); set('shadow', 'opacity', Math.max(.08, .25 - toon.lift * .005));
+  set('banana', 'opacity', toon.banana > .5 ? 1 : 0);
 
-  const breathe = calm || state === 'sleeping' ? Math.sin(now / 1700) * (calm ? 0 : 1.5) : Math.sin(now / 900) * 5;
-  const hop = state === 'happy' && !calm ? -Math.abs(Math.sin(now / 170)) * 14 : 0;
-  const lift = breathe + hop + face.lean * 3;
-  const sx = 1 + face.squash * .09 + face.lean * .025, sy = 1 - face.squash * .12 + face.lean * .025;
-  set('whole', 'transform', `translate(150 ${150 + lift}) scale(${sx} ${sy}) translate(-150 -150)`);
-  set('head', 'transform', `rotate(${face.tilt} 150 140)`);
-  const waving = !calm && now < waveUntil ? Math.sin(now / 110) * 16 - 26 : 0;
-  const cheer = state === 'happy' && !calm ? Math.sin(now / 90) * 12 - 30 : 0;
-  set('handR', 'transform', `rotate(${waving || cheer} 239 200)`);
-  set('handL', 'transform', `rotate(${-cheer} 61 200)`);
-  set('shadow', 'rx', 66 - lift * .8); set('shadow', 'opacity', .22 + lift * .004);
+  const heelL = 126 - toon.footL * .15, heelR = 174 + toon.footR * .15, footY = 276;
+  hose('legL', 137, 250, heelL, footY - toon.footL, -3);
+  hose('legR', 163, 250, heelR, footY - toon.footR, 3);
+  place('shoeL', heelL - 5, footY - toon.footL, toon.footL * .7);
+  place('shoeR', heelR + 5, footY - toon.footR, -toon.footR * .7);
+  hose('armL', 113, 206, toon.handLx, toon.handLy, -14);
+  hose('armR', 187, 206, toon.handRx, toon.handRy, 14);
+  place('handL', toon.handLx, toon.handLy, (toon.handLy < 180 ? 170 : 0));
+  place('handR', toon.handRx, toon.handRy, (toon.handRy < 180 ? -170 : 0));
 
-  drawEye('L', 116, 118, now); drawEye('R', 184, 118, now);
-  const cx = 150 + face.lookX * 5, cy = 165 + face.lookY * 3;
-  const half = 14 + face.wide * 15, open2 = face.mouthOpen * 26, curve = face.smile * 9;
-  set('mouth', 'd', `M${cx - half} ${cy - curve * .35} Q${cx} ${cy + curve - open2 * .28} ${cx + half} ${cy - curve * .35} Q${cx} ${cy + curve * 1.25 + open2} ${cx - half} ${cy - curve * .35}Z`);
-  set('cheekL', 'opacity', face.cheek); set('cheekR', 'opacity', face.cheek);
-  const earGrow = 1 + face.ears * .9;
-  for (const [id, x] of [['earL', 43], ['earR', 257]]) set(id, 'transform', `translate(${x} 134) scale(${earGrow} ${1 + face.ears * .25}) translate(${-x} -134)`);
-  set('tip', 'r', state === 'thinking' ? 8 + Math.sin(now / 130) * 2.5 : 8 + face.ears * 4);
-  set('tip', 'opacity', state === 'sleeping' ? .35 : 1);
-  set('heart', 'r', 5.5 + Math.sin(now / (speaking ? 150 : 520)) * 1.4);
-  set('snore', 'opacity', face.snore);
-  set('snore', 'transform', `translate(0 ${-Math.abs(Math.sin(now / 1500)) * 10})`);
+  drawEye('L', 122, 93, 21, now); drawEye('R', 179, 92, 24, now);
+  const raise = toon.worry * 4;
+  set('browL', 'transform', `translate(121 ${60 + toon.browL}) rotate(${toon.worry * -20 + toon.smile * -3 - toon.lookX * 2})`);
+  set('browR', 'transform', `translate(180 ${56 + toon.browR}) rotate(${toon.worry * 20 + toon.smile * 3 - toon.lookX * 2})`);
+  set('nose', 'transform', `translate(${toon.lookX * 4} ${toon.lookY * 2 - raise * .2})`);
+
+  const cx = 150 + toon.lookX * 3 + toon.side * 9, cy = 156 + toon.lookY * 1.5;
+  const half = 15 + toon.wide * 27, gape = toon.mouthOpen * 29, curve = toon.smile * 13;
+  const leftY = cy - curve * .5 + toon.side * 7, rightY = cy - curve * .5 - toon.side * 7;
+  const mouth = `M${cx - half} ${leftY}Q${cx} ${cy + curve - gape * .28} ${cx + half} ${rightY}Q${cx} ${cy + curve * 1.3 + gape} ${cx - half} ${leftY}Z`;
+  set('mouth', 'd', mouth); set('mouthClip', 'd', mouth);
+  set('teeth', 'y', cy + curve * .25 - gape * .28 - 6); set('teeth', 'x', cx - 54);
+  set('teeth', 'height', toon.smile > .3 || gape > 7 ? 11 : 0);
+  set('tongue', 'cx', cx); set('tongue', 'cy', cy + curve * .8 + gape * .85);
+  set('lick', 'transform', `translate(${cx + 8} ${cy + curve * .55 + gape * .3})`); set('lick', 'opacity', toon.lick > .4 ? 1 : 0);
+  set('cheekL', 'opacity', toon.cheek); set('cheekR', 'opacity', toon.cheek);
+  set('sweat', 'opacity', toon.sweat > .3 ? 1 : 0);
+  set('sweat', 'transform', `translate(0 ${toon.sweat > .3 ? (now / 18) % 14 : 0})`);
+  set('stars', 'opacity', toon.stars > .4 ? 1 : 0);
+  [0, 2.09, 4.18].forEach((phase, index) => {
+    const angle = now / 260 + phase;
+    set(`star${index + 1}`, 'x', 150 + Math.cos(angle) * 66); set(`star${index + 1}`, 'y', 28 + Math.sin(angle) * 13);
+  });
+  set('thought', 'opacity', toon.thought > .35 ? 1 : 0);
+  set('thoughtMark', 'font-size', 20 + (calm ? 0 : Math.sin(now / 200) * 2.5));
+  set('snore', 'opacity', toon.snore > .3 ? toon.snore : 0);
+  set('snore', 'transform', `translate(0 ${calm ? 0 : -Math.abs(Math.sin(now / 1500)) * 10})`);
+  set('notes', 'opacity', toon.notes > .3 ? 1 : 0);
+  set('notes', 'transform', `translate(${Math.sin(now / 240) * 7} ${calm ? 0 : -((now / 30) % 18)})`);
   drawRing(state, now);
   micLevel *= .9;
 }
 
-// Around Buddy: sound bars while listening, orbiting lights while thinking, ripples while talking.
+// Around Buddy: sound waves reaching his ear while listening, and confetti for good news.
 const ring = $('ring'), paint = ring.getContext('2d');
 function burst(count, x = 300, y = 280) {
   if (calm) return;
   for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2, speed = 2 + Math.random() * 5;
-    sparks.push({x, y, vx:Math.cos(angle) * speed, vy:Math.sin(angle) * speed - 2, life:1, hue:[172, 240, 45, 340][i % 4]});
+    const angle = Math.random() * Math.PI * 2, speed = 2 + Math.random() * 6;
+    sparks.push({x, y, vx:Math.cos(angle) * speed, vy:Math.sin(angle) * speed - 3, life:1, spin:Math.random() * 6, color:['#e8483d', '#2f6fde', '#2ea84f', '#ffe14d', '#f08a24'][i % 5]});
   }
 }
 function drawRing(state, now) {
-  const glow = {listening:'#fb7185', thinking:'#818cf8', speaking:'#5eead4'}[state];
   paint.clearRect(0, 0, 600, 600);
   paint.lineCap = 'round';
   if (state === 'listening') {
-    paint.strokeStyle = glow;
-    for (let i = 0; i < 72; i++) {
-      const angle = i / 72 * Math.PI * 2, ripple = Math.sin(i * 2.4 + now / 90) * .5 + .5;
-      const length = 5 + Math.min(1, micLevel) * (20 + ripple * 56);
-      paint.lineWidth = 4;
-      paint.globalAlpha = .45 + Math.min(.55, micLevel);
-      paint.beginPath();
-      paint.moveTo(300 + Math.cos(angle) * 226, 290 + Math.sin(angle) * 226);
-      paint.lineTo(300 + Math.cos(angle) * (226 + length), 290 + Math.sin(angle) * (226 + length));
-      paint.stroke();
-    }
-  } else if (state === 'thinking' && !calm) {
-    paint.fillStyle = glow;
-    for (let i = 0; i < 8; i++) {
-      const angle = now / 420 + i * .5;
-      paint.globalAlpha = (i + 1) / 8;
-      paint.beginPath();
-      paint.arc(300 + Math.cos(angle) * 244, 290 + Math.sin(angle) * 244, 3 + i * .9, 0, Math.PI * 2);
-      paint.fill();
-    }
-  } else if (state === 'speaking' && !calm) {
-    paint.strokeStyle = glow;
-    paint.lineWidth = 3;
+    paint.strokeStyle = '#f7f3ea';
+    paint.lineWidth = 6;
     for (let i = 0; i < 3; i++) {
-      const grown = (now / 1500 + i / 3) % 1;
-      paint.globalAlpha = (1 - grown) * .55;
+      const grown = calm ? i / 3 : (now / 900 + i / 3) % 1;
+      paint.globalAlpha = (grown < .5 ? 1 : 2 - grown * 2) * (.45 + Math.min(.55, micLevel * 2));
       paint.beginPath();
-      paint.arc(300, 290, 212 + grown * 76, 0, Math.PI * 2);
+      paint.arc(490, 205, 96 - grown * 64, -Math.PI * .28 + Math.PI, Math.PI * .28 + Math.PI, false);
       paint.stroke();
     }
   }
   sparks = sparks.filter(spark => spark.life > 0);
   for (const spark of sparks) {
-    spark.x += spark.vx; spark.y += spark.vy; spark.vy += .13; spark.life -= .022;
-    paint.globalAlpha = Math.max(0, spark.life);
-    paint.fillStyle = `hsl(${spark.hue} 90% 66%)`;
-    paint.beginPath();
-    paint.arc(spark.x, spark.y, 2 + spark.life * 4, 0, Math.PI * 2);
-    paint.fill();
+    spark.x += spark.vx; spark.y += spark.vy; spark.vy += .17; spark.life -= .017; spark.spin += .2;
+    paint.globalAlpha = Math.min(1, spark.life * 2);
+    paint.fillStyle = spark.color;
+    paint.save();
+    paint.translate(spark.x, spark.y);
+    paint.rotate(spark.spin);
+    paint.fillRect(-6, -3.5, 12, 7);
+    paint.restore();
   }
   paint.globalAlpha = 1;
 }
@@ -454,26 +672,67 @@ addEventListener('pointermove', event => {
   const box = $('mic').getBoundingClientRect();
   pointer.x = Math.max(-1, Math.min(1, (event.clientX - box.left - box.width / 2) / (innerWidth / 2.2)));
   pointer.y = Math.max(-1, Math.min(1, (event.clientY - box.top - box.height * .42) / (innerHeight / 2)));
-  if (document.body.dataset.state === 'sleeping') { showBubble('Oh! Hi. I was resting my eyes.'); waveUntil = performance.now() + 1400; }
+  if (document.body.dataset.state === 'sleeping') { showBubble('Oh! Hi. I was resting my eyes.'); startGag('shock'); }
   touch();
 });
 addEventListener('keydown', touch);
 const GREETINGS = ['Good morning', 'Good afternoon', 'Good evening'];
+// Made here rather than played from files, each note: wave, start and end pitch, when, how long, how loud.
+const POKE_SOUNDS = {
+  boing: [['triangle', 130, 620, 0, .13, .5], ['triangle', 620, 170, .13, .24, .42]],
+  honk: [['square', 330, 270, 0, .13, .22], ['square', 330, 250, .17, .2, .22]],
+  giggle: [['sine', 620, 780, 0, .07, .5], ['sine', 700, 880, .09, .07, .5], ['sine', 640, 820, .18, .07, .5], ['sine', 760, 1000, .27, .1, .5]],
+  squeak: [['sine', 950, 1900, 0, .08, .4], ['sine', 1800, 1100, .08, .09, .35]],
+  dizzy: [['sawtooth', 900, 240, 0, .34, .14], ['sine', 1300, 1500, .36, .1, .3], ['sine', 1700, 1900, .47, .12, .3]],
+};
+let pokeAudio = null;
+function pokeSound(name, context) {
+  if (!context) {
+    pokeAudio ||= new AudioContext();
+    pokeAudio.resume();
+    context = pokeAudio;
+  }
+  const start = context.currentTime + .005;
+  for (const [wave, from, to, at, length, loud] of POKE_SOUNDS[name]) {
+    const tone = context.createOscillator(), level = context.createGain();
+    tone.type = wave;
+    tone.frequency.setValueAtTime(from, start + at);
+    tone.frequency.exponentialRampToValueAtTime(to, start + at + length);
+    level.gain.setValueAtTime(.0001, start + at);
+    level.gain.exponentialRampToValueAtTime(loud, start + at + .012);
+    level.gain.exponentialRampToValueAtTime(.0001, start + at + length);
+    tone.connect(level).connect(context.destination);
+    tone.start(start + at);
+    tone.stop(start + at + length + .02);
+  }
+}
+const POKES = [
+  {above:95, sound:'boing', say:['Not the hair!', 'I just combed that.', 'Mind the hair!'], gag:'scratch'},
+  {above:153, sound:'honk', say:['Ow! My nose!', 'Boop!', 'Hey! That’s my face.', 'Who did that?'], gag:'shock'},
+  {above:222, sound:'giggle', say:['Hee hee! Stop it!', 'Ha ha! That tickles!', 'Not the abs!', 'Leg day was yesterday!'], wiggle:true},
+  {above:999, sound:'squeak', say:['Ooh! My toes!', 'Watch the shoes!', 'I only have the two feet.'], gag:'oops'},
+];
 function poke(event) {
   const now = performance.now();
-  face.squash = 1;
-  wiggleUntil = now + 420;
+  toon.squash = 1;
   touch();
   const box = $('mic').getBoundingClientRect();
-  burst(8, (event?.clientX - box.left) / box.width * 600 || 300, (event?.clientY - box.top) / box.height * 600 || 280);
+  const y = (event?.clientY - box.top) / box.height * 300 || 150;
+  burst(8, (event?.clientX - box.left) / box.width * 600 || 300, y * 2);
   pokes = [...pokes.filter(at => now - at < 2500), now];
   if (pokes.length >= 5) {
     pokes = [];
-    dizzyUntil = now + 2000;
-    showBubble('Okay, okay! I’m dizzy now.');
-  } else {
-    showBubble(['Hee! That tickles.', 'Hold me while you talk.', 'Boop!', 'Still here!'][Math.floor(Math.random() * 4)]);
+    dizzyUntil = now + 2400;
+    gag = null;
+    pokeSound('dizzy');
+    showBubble('Okay, okay! I can see stars.');
+    return;
   }
+  const spot = POKES.find(zone => y < zone.above);
+  pokeSound(spot.sound);
+  if (spot.gag) startGag(spot.gag);
+  if (spot.wiggle) wiggleUntil = now + 900;
+  showBubble(spot.say[Math.floor(Math.random() * spot.say.length)]);
 }
 $('mic').addEventListener('dblclick', () => { winkUntil = performance.now() + 520; });
 
@@ -597,6 +856,7 @@ const typing = target => /^(INPUT|TEXTAREA|SELECT|SUMMARY)$/.test(target.tagName
 addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     if ($('panel').classList.contains('open')) togglePanel(false);
+    else if (!$('shelf').hidden) toggleShelf(false);
     else api('/api/stop', {method: 'POST'}).catch(() => {});
   }
   if (event.code === 'Space' && !event.repeat && !typing(event.target)) { event.preventDefault(); startHold(); }
@@ -621,21 +881,219 @@ function togglePanel(open) {
   $('panel').classList.toggle('open', open);
   $('panelToggle').setAttribute('aria-expanded', open);
   (open ? $('panelClose') : $('panelToggle')).focus();
+  if (open) refreshModels();
 }
 $('panelToggle').addEventListener('click', () => togglePanel(true));
 $('panelClose').addEventListener('click', () => togglePanel(false));
 
-// The chat stays out of the way until asked for
+// The chat stays out of the way until asked for. The drawing pad takes its place during a drawing game.
+let chatOpen = false;
+function arrange() {
+  const drawing = Boolean(game?.drawing);
+  $('pad').hidden = !drawing || chatOpen;
+  $('talk').hidden = !chatOpen;
+  $('layout').classList.toggle('chatting', drawing || chatOpen);
+  document.body.classList.toggle('drawing', drawing);
+  $('chatToggle').setAttribute('aria-expanded', chatOpen);
+}
 $('chatToggle').addEventListener('click', () => {
-  const open = $('talk').hidden;
-  $('talk').hidden = !open;
-  $('layout').classList.toggle('chatting', open);
-  $('chatToggle').setAttribute('aria-expanded', open);
+  chatOpen = !chatOpen;
+  arrange();
+  const open = chatOpen;
   if (!open) { micButton.focus(); return; } // so Space goes back to talking, not to reopening the chat
   $('chatDot').hidden = true;
   $('log').scrollTop = $('log').scrollHeight; // lines added while hidden couldn't scroll it
   $('text').focus();
 });
+
+// Which AI model runs Buddy, and getting another one
+const modelSave = (path, body) => api(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+function modelLine(text, ...classes) {
+  const line = document.createElement('span');
+  line.textContent = text;
+  line.classList.add('small', ...classes);
+  return line;
+}
+function showModels(data) {
+  const {laptop, download} = data;
+  const card = laptop.card ? `${laptop.card} with ${laptop.video_gb} GB` : 'No NVIDIA graphics card found';
+  $('laptop').textContent = `This laptop: ${card}, ${laptop.memory_gb} GB of memory, ${laptop.free_gb} GB of free disk.`;
+  if (document.activeElement !== $('modelChoice')) {
+    const names = data.installed.map(model => model.name);
+    $('modelChoice').replaceChildren(...[...new Set([data.current, ...names])].map(name => {
+      const found = data.installed.find(model => model.name === name);
+      return new Option(found ? `${name} (${found.gb} GB)` : `${name} (not downloaded)`, name);
+    }));
+    $('modelChoice').value = data.current;
+    const current = data.installed.find(model => model.name === data.current);
+    $('model').textContent = data.problem || (current ? current.fit.text : '');
+  }
+  const running = download?.state === 'downloading';
+  $('modelProgress').hidden = !download || download.state === 'finished' && !running;
+  $('modelCancel').hidden = !running;
+  if (download) {
+    const part = download.total ? download.done / download.total : 0;
+    $('modelBar').value = part;
+    $('modelProgressText').textContent = running
+      ? download.total ? `Downloading ${download.name}: ${(download.done / 1e9).toFixed(1)} of ${(download.total / 1e9).toFixed(1)} GB` : `Starting to download ${download.name}…`
+      : download.state === 'cancelled' ? `Cancelled ${download.name}. Downloading it again carries on from there.`
+      : `Couldn't download ${download.name}. ${download.error}`;
+  }
+  $('modelList').replaceChildren(...data.available.map(model => {
+    const row = document.createElement('div');
+    row.className = 'modelRow';
+    const about = document.createElement('div');
+    const title = document.createElement('b');
+    title.textContent = model.name + (model.name === data.recommended ? ' (best for this laptop)' : '');
+    about.append(title,
+      modelLine(`${model.gb} GB. ${model.note}${model.sees ? '' : ". Can't look at the screen or at pictures"}`),
+      modelLine(model.fit.text, `fit-${model.fit.level}`));
+    const get = document.createElement('button');
+    get.className = 'plain';
+    get.type = 'button';
+    get.textContent = 'Download';
+    get.disabled = running;
+    get.addEventListener('click', () => getModel(model.name));
+    row.append(about, get);
+    return row;
+  }));
+  if (download?.state === 'finished' && lastDownload !== download.name) {
+    lastDownload = download.name;
+    addLine('log', `Downloaded ${download.name}. Choose it under Model in use to switch.`);
+  }
+}
+let lastDownload = '', modelsTimer = 0;
+async function refreshModels() {
+  clearTimeout(modelsTimer);
+  let data = null;
+  try { data = await api('/api/models'); showModels(data); } catch {}
+  if ($('panel').classList.contains('open') || data?.download?.state === 'downloading') modelsTimer = setTimeout(refreshModels, 2000);
+}
+async function getModel(name) {
+  const data = await modelSave('/api/models/download', {name});
+  $('modelError').textContent = data.detail || '';
+  if (data.detail) return;
+  showModels(data);
+  refreshModels();
+}
+$('modelChoice').addEventListener('change', async event => {
+  const chosen = await modelSave('/api/models/use', {name: event.target.value});
+  event.target.blur();
+  $('modelError').textContent = chosen.detail || '';
+  if (chosen.detail) return;
+  addLine('log', `Now using ${chosen.current}`);
+  refreshModels();
+  if (!chosen.sees) addLine('log', `${chosen.current} can't see pictures, so looking at the screen and Draw and Guess won't work with it.`);
+});
+$('modelCancel').addEventListener('click', () => api('/api/models/download', {method: 'DELETE'}).catch(() => {}));
+$('modelForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const name = $('modelName').value.trim();
+  if (name) { $('modelName').value = ''; getModel(name); }
+});
+
+// Games. The server keeps the game going, so this only shows where it's got to.
+function toggleShelf(open) {
+  $('shelf').hidden = !open;
+  document.body.classList.toggle('choosing', open);
+  $('gamesToggle').setAttribute('aria-expanded', open);
+}
+$('gamesToggle').addEventListener('click', () => {
+  if (game) { runCommand('stop the game'); return; }
+  toggleShelf($('shelf').hidden);
+});
+$('shelf').addEventListener('click', event => {
+  const choice = event.target.closest('button')?.dataset.say;
+  if (choice) { toggleShelf(false); burst(10); runCommand(choice); }
+});
+let shownGame = '';
+function showGame(next) {
+  const changed = JSON.stringify(next);
+  if (changed === shownGame) return;
+  const started = next && !game, round = game?.round;
+  shownGame = changed;
+  game = next;
+  $('gameBar').hidden = !next;
+  document.body.classList.toggle('playing', Boolean(next));
+  $('gamesToggle').textContent = next ? 'End game' : 'Games';
+  if (next) {
+    toggleShelf(false);
+    $('gameTitle').textContent = next.title;
+    $('gameScore').textContent = next.score;
+    $('gameButtons').replaceChildren(...next.buttons.map(label => {
+      const button = document.createElement('button');
+      button.className = 'plain';
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', () => runCommand(label));
+      return button;
+    }));
+    if (next.drawing) {
+      if (started || next.round !== round) clearSketch();
+      $('padGuess').disabled = sketchSent;
+    }
+    if (started && chatOpen && next.drawing) { chatOpen = false; }
+    if (started && !next.drawing) $('gameText').focus();
+  }
+  arrange();
+}
+$('gameForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const text = $('gameText').value.trim();
+  if (!text) return;
+  $('gameText').value = '';
+  runCommand(text);
+});
+
+// The drawing pad. Lines are kept as a list, so Undo can take the last one away.
+const sketch = $('sketch'), pen = sketch.getContext('2d');
+let strokes = [], sketchSent = false;
+function drawStroke(points) {
+  pen.strokeStyle = '#1d1712'; pen.lineWidth = 7; pen.lineCap = pen.lineJoin = 'round';
+  pen.beginPath();
+  pen.moveTo(points[0].x, points[0].y);
+  for (const point of points) pen.lineTo(point.x, point.y);
+  if (points.length === 1) pen.lineTo(points[0].x + .1, points[0].y);
+  pen.stroke();
+}
+function repaintSketch() {
+  pen.fillStyle = '#fff';
+  pen.fillRect(0, 0, sketch.width, sketch.height);
+  strokes.forEach(drawStroke);
+}
+function clearSketch() { strokes = []; sketchSent = false; $('padGuess').disabled = false; repaintSketch(); }
+function penAt(event) {
+  const box = sketch.getBoundingClientRect();
+  return {x:(event.clientX - box.left) / box.width * sketch.width, y:(event.clientY - box.top) / box.height * sketch.height};
+}
+sketch.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  sketch.setPointerCapture(event.pointerId);
+  strokes.push([penAt(event)]);
+  sketchSent = false;
+  $('padGuess').disabled = false;
+  drawStroke(strokes.at(-1));
+});
+sketch.addEventListener('pointermove', event => {
+  if (!sketch.hasPointerCapture(event.pointerId)) return;
+  const line = strokes.at(-1);
+  line.push(penAt(event));
+  drawStroke(line.slice(-2));
+});
+$('padUndo').addEventListener('click', () => { strokes.pop(); sketchSent = false; $('padGuess').disabled = false; repaintSketch(); });
+$('padClear').addEventListener('click', clearSketch);
+$('padGuess').addEventListener('click', () => {
+  if (!strokes.length) { showBubble('Draw something first! Even a bad one.'); startGag('oops'); return; }
+  sketchSent = true;
+  $('padGuess').disabled = true;
+  sketch.toBlob(async blob => {
+    const form = new FormData();
+    form.append('file', blob, 'drawing.jpg');
+    try { await api('/api/game/drawing', {method: 'POST', body: form}); }
+    catch (error) { addLine('error', `Couldn't send the drawing: ${error.message}`); sketchSent = false; $('padGuess').disabled = false; }
+  }, 'image/jpeg', .9);
+});
+repaintSketch();
 
 // Live screen on the phone
 let shareUrl = '', shareActive = false;
@@ -717,7 +1175,6 @@ api('/api/settings').then(settings => {
   $('phone').value = settings.whatsapp_phone;
   $('agent').checked = settings.agent_enabled;
   $('whatsappControl').checked = settings.whatsapp_control;
-  $('model').textContent = settings.ai_model ? `Model: ${settings.ai_model}, running on this laptop` : '';
 }).catch(() => {});
 
 const hour = new Date().getHours();
@@ -725,5 +1182,6 @@ showBubble(`${GREETINGS[hour < 12 ? 0 : hour < 18 ? 1 : 2]}! I’m Buddy. Hold m
 requestAnimationFrame(frame);
 poll();
 </script>
+<script type="module" src="/static/buddy3d.js"></script>
 </body>
 </html>

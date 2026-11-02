@@ -7,6 +7,10 @@ from faster_whisper.audio import decode_audio
 from faster_whisper.vad import get_speech_timestamps
 
 
+def seconds_of(audio: bytes) -> float:
+    return len(decode_audio(io.BytesIO(audio))) / 16000  # what decode_audio always gives
+
+
 def has_speech(audio: bytes) -> bool:
     """A separate voice detector, because Whisper itself can invent whole sentences from silence."""
     return bool(get_speech_timestamps(decode_audio(io.BytesIO(audio))))
@@ -29,15 +33,26 @@ class Transcriber:
     def transcribe(self, audio: bytes) -> str:
         return self.transcribe_with_confidence(audio)[0]
 
-    def transcribe_with_confidence(self, audio: bytes, expect: str | None = None) -> tuple[str, float, float]:
+    def language_scores(self, audio: bytes, among: tuple) -> dict:
+        """For a model that knows many languages: how likely each of these is, out of 1. Whisper splits Hindi between its Hindi and Urdu, which sound the same."""
+        self.load()
+        with self._lock:
+            _, _, scores = self._model.detect_language(audio=decode_audio(io.BytesIO(audio)))
+        likely = dict(scores)
+        likely["hi"] = likely.get("hi", 0) + likely.get("ur", 0)
+        total = sum(likely.get(name, 0) for name in among) or 1
+        return {name: likely.get(name, 0) / total for name in among}
+
+    def transcribe_with_confidence(self, audio: bytes, expect: str | None = None, language: str | None = None) -> tuple[str, float, float]:
         """The text, how likely the audio held no speech, and the model's average log probability.
 
         expect: words the speech may well contain, which helps with accents the model finds harder.
+        language: for a model that knows many, what this audio is in.
         """
         self.load()
         with self._lock:
             segments, _ = self._model.transcribe(
-                io.BytesIO(audio), language=self.language, beam_size=self.beam_size, vad_filter=self.skip_silence, hotwords=expect,
+                io.BytesIO(audio), language=language or self.language, beam_size=self.beam_size, vad_filter=self.skip_silence, hotwords=expect,
                 condition_on_previous_text=False,
             )
             parts = list(segments)

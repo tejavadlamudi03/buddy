@@ -416,7 +416,12 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
 
     if re.fullmatch(rf"play {PRONOUN}", low):
         return [step("youtube_play", query=ctx.last_query)] if ctx.last_query else [step("resume_media")]
-    if match := re.fullmatch(r"play\s+(?:the\s+song\s+|the\s+video\s+|song\s+)?(.+?)(?:\s+(?:on|in)\s+youtube)?", text, re.I):
+    # The word stays in the search: with a less known name, it's what makes YouTube look for music.
+    if match := re.fullmatch(r"play\s+(?:(?:a|the)\s+)?song[,:]?\s+(.+?)(?:\s+(?:on|in)\s+youtube)?", text, re.I):
+        name = match.group(1).strip(" '\"")
+        ctx.last_query, ctx.on_youtube = f"{name} song", True
+        return [step("youtube_play", query=ctx.last_query)]
+    if match := re.fullmatch(r"play\s+(?:the\s+video\s+)?(.+?)(?:\s+(?:on|in)\s+youtube)?", text, re.I):
         ctx.last_query, ctx.on_youtube = match.group(1).strip(" '\""), True
         return [step("youtube_play", query=ctx.last_query)]
 

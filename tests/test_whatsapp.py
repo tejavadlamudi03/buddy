@@ -337,3 +337,12 @@ def test_a_clear_voice_note_runs_right_away(monkeypatch):
     bridge._unsure = None
     bridge._handle_media(FakePage(), {"voice": True, "id": "1", "meta": _fresh_meta()})
     assert handled == ["open chrome"]
+
+
+def test_the_same_answer_twice_in_a_minute_counts_twice():
+    """A game gets plenty of these, and each one is a new turn."""
+    stamp = datetime.now().strftime("[%H:%M, %d/%m/%Y] Me: ")
+    rows = [{"key": f"{stamp}|no|{count}", "kind": "in", "text": "no", "stamp": stamp} for count in (1, 2)]
+    seen = set()
+    assert commands_from(rows[:1], seen) == ["no"]
+    assert commands_from(rows, seen) == ["no"]

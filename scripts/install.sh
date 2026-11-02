@@ -182,6 +182,8 @@ if [ "$PROFILE" != basic ]; then
     scripts/install-local-ai.sh "$MODEL" || stop_on_failure "the local AI"
     step "Telugu speech model (about 750 MB when done)"
     scripts/install-telugu.sh || stop_on_failure "the Telugu speech model"
+    step "Hindi and German: speech model and voices"
+    scripts/install-languages.sh "$([ "$PROFILE" = full ] && echo medium || echo small)" || stop_on_failure "the Hindi and German speech model"
 fi
 
 step "App menu and auto-start"
