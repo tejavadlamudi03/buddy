@@ -14,6 +14,7 @@ DEFAULTS = {
     "whisper_model": "small.en",  # the laptop mic, where speed matters and it may run continuously
     "voice_note_model": "medium.en",  # WhatsApp voice notes: phone audio, where a few seconds is fine
     "telugu_whisper_model": str(DATA_DIR / "whisper-telugu-medium"),  # made by scripts/install-telugu.sh
+    "languages_whisper_model": "medium",  # hears Hindi and German: fetched by scripts/install-languages.sh
     "whatsapp_phone": "",  # international format, digits only, e.g. 4915112345678
     "agent_enabled": True,  # False: requests the rules don't know just get "I didn't understand"
     "whatsapp_control": False,  # True: take commands from whatsapp_phone, and from nobody else
@@ -33,7 +34,7 @@ PROFILES = {
     "full": {"ai_model": "gemma4:e4b-it-q4_K_M", "ai_context": 12288, "agent_enabled": True,  # 8 GB of video memory
              "whisper_model": "small.en", "voice_note_model": "medium.en"},
     "light": {"ai_model": "gemma4:e2b", "ai_context": 8192, "agent_enabled": True,  # a smaller card, or none at all
-              "whisper_model": "base.en", "voice_note_model": "small.en"},
+              "whisper_model": "base.en", "voice_note_model": "small.en", "languages_whisper_model": "small"},
     "basic": {"agent_enabled": False, "whisper_model": "base.en", "voice_note_model": "small.en"},  # built-in commands only
 }
 

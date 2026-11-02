@@ -10,13 +10,16 @@ import urllib.request
 import wave
 from pathlib import Path
 
-from . import config
+from . import config, language
 
 VOICE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/"
 VOICE = "en_GB-alan-medium.onnx"
-TELUGU_VOICE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/te/te_IN/venkatesh/medium/"
-TELUGU_VOICE = "te_IN-venkatesh-medium.onnx"
-TELUGU_SCRIPT = re.compile(r"[ఀ-౿]")
+VOICES = {
+    "english": (VOICE_URL, VOICE),
+    "telugu": ("https://huggingface.co/rhasspy/piper-voices/resolve/main/te/te_IN/venkatesh/medium/", "te_IN-venkatesh-medium.onnx"),
+    "hindi": ("https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/pratham/medium/", "hi_IN-pratham-medium.onnx"),
+    "german": ("https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/", "de_DE-thorsten-medium.onnx"),
+}
 MARKUP = re.compile(r"[*_`~]")  # WhatsApp formatting in a reply, which shouldn't be read out
 # ffmpeg filters, applied after the speech is made, so they work for every language. {rate} is its sample rate.
 STYLES = {
@@ -78,7 +81,7 @@ class Speaker:
             self._player.terminate()
 
     def _voice_for(self, text: str):
-        url, name = (TELUGU_VOICE_URL, TELUGU_VOICE) if TELUGU_SCRIPT.search(text) else (VOICE_URL, VOICE)
+        url, name = VOICES[language.written_in(text)]
         if name not in self._voices:
             from piper import PiperVoice
             self._voices[name] = PiperVoice.load(str(_voice_path(url, name)))

@@ -10,6 +10,7 @@ from buddy.listen import Listener
 @pytest.fixture(autouse=True)
 def someone_is_speaking(monkeypatch):
     monkeypatch.setattr(listen, "has_speech", lambda audio: True)
+    monkeypatch.setattr(listen, "seconds_of", lambda audio: 3.0)
 
 
 @pytest.fixture
@@ -89,14 +90,14 @@ def test_the_voice_detector_tells_speech_from_silence():
 
 def test_a_sentence_the_telugu_model_mostly_missed_stays_english(monkeypatch):
     monkeypatch.setattr(ai, "chat", lambda *a, **k: pytest.fail("the model was asked"))
-    assert language.pick("who wrote Romeo and Juliet", "జూలియట్") == "english"
-    assert language.pick("please open the window for me now", "అవును") == "english"
+    assert language.pick("who wrote Romeo and Juliet", {"telugu": "జూలియట్"}) == "english"
+    assert language.pick("please open the window for me now", {"telugu": "అవును"}) == "english"
 
 
 def test_a_short_telugu_reply_beats_a_short_english_mishearing(monkeypatch):
     monkeypatch.setattr(ai, "chat", lambda *a, **k: pytest.fail("the model was asked"))
-    assert language.pick("I will know.", "అవును") == "telugu"
-    assert language.pick("A B O O", "ఆపు") == "telugu"
+    assert language.pick("I will know.", {"telugu": "అవును"}) == "telugu"
+    assert language.pick("A B O O", {"telugu": "ఆపు"}) == "telugu"
 
 
 def test_a_screenshot_asked_for_on_whatsapp_is_sent(power, monkeypatch):
@@ -144,14 +145,14 @@ def test_hands_free_telugu_keeps_the_wake_word(monkeypatch):
 @pytest.mark.parametrize("word", ["ఆపు", "అవును", "వద్దు", "సరే."])
 def test_short_telugu_replies_need_no_model(monkeypatch, word):
     monkeypatch.setattr(ai, "chat", lambda *a, **k: pytest.fail("the model was asked"))
-    assert language.pick("Apple", word) == "telugu"
+    assert language.pick("Apple", {"telugu": word}) == "telugu"
 
 
 def test_pick_falls_back_to_english_without_the_model(monkeypatch):
     def down(*a, **k):
         raise ai.NotReady("not installed")
     monkeypatch.setattr(ai, "chat", down)
-    assert language.pick("Open Chrome.", "ఓపెన్ క్రౌన్") == "english"
+    assert language.pick("Open Chrome.", {"telugu": "ఓపెన్ క్రౌన్"}) == "english"
 
 
 def test_understand_falls_back_to_the_agent_on_a_bad_reply(monkeypatch):
@@ -274,3 +275,140 @@ def test_telugu_gets_a_firmer_instruction_to_reply_in_telugu():
 def test_tidy_cleans_formatting_but_never_code():
     assert language.tidy("***bold*** and **more** $\\rightarrow$ done") == "*bold* and *more* → done"
     assert language.tidy("Power:\n```python\nprint(2**3)\n```\n**Done**") == "Power:\n```python\nprint(2**3)\n```\n*Done*"
+
+
+def test_which_language_text_is_written_in():
+    cases = {"Mach die Musik leiser bitte": "german", "Wie spät ist es?": "german", "Die Hauptstadt von Bayern ist München": "german", "Nein": "german", "Ja": "german",
+             "भारत की राजधानी नई दिल्ली है": "hindi", "వైఫై ఆఫ్ చెయ్యి": "telugu", "What time is it?": "english", "Done": "english",
+             "Volume set to 50%": "english", "I'm thinking of an animal. You have 20 questions.": "english", "Closed calculator": "english",
+             "Sent the die roll": "english", "This was the hat": "english"}
+    for text, name in cases.items():
+        assert language.written_in(text) == name, text
+
+
+class Wider(Ear):
+    def __init__(self, text, likeliest, no_speech=0.1, confidence=-0.4):
+        super().__init__(text, no_speech, confidence)
+        self.likeliest = likeliest
+        self.language = None
+
+    def language_scores(self, audio, among):
+        assert "en" in among
+        return {name: 0.8 if name == self.likeliest else 0.2 / 3 for name in among}
+
+    def transcribe_with_confidence(self, audio, expect=None, language=None):
+        self.language = language
+        return super().transcribe_with_confidence(audio, expect)
+
+
+def test_german_speech_is_heard(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "german")
+    wider = Wider("Mach die Musik leiser", "de")
+    listener = Listener(Ear("Mach the Moose equal"), None, wider)
+    assert listener.transcribe_with_confidence(b"x") == ("Mach die Musik leiser", 0.1, -0.4)
+    assert wider.language == "de"
+
+
+def test_hindi_speech_is_heard_next_to_telugu(monkeypatch):
+    offered = {}
+    monkeypatch.setattr(language, "pick", lambda english, others: offered.update(others) or "hindi")
+    telugu = Ear("ఆవాజ్ కమ్ కరో")
+    wider = Wider("आवाज़ कम करो", "hi")
+    wider.language_scores = lambda audio, among: {"en": 0.1, "te": 0.4, "hi": 0.5, "de": 0.0}  # not sure enough to skip Telugu
+    assert Listener(Ear("Our was come crow"), telugu, wider).transcribe("x".encode()) == "आवाज़ कम करो"
+    assert set(offered) == {"telugu", "hindi"}
+
+
+def test_being_sure_its_hindi_saves_running_the_telugu_model(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "hindi")
+    telugu = Ear("ఆవాజ్ కమ్ కరో")
+    assert Listener(Ear("Our was come crow"), telugu, Wider("आवाज़ कम करो", "hi")).transcribe(b"x") == "आवाज़ कम करो"
+    assert telugu.used == 0
+
+
+def test_a_short_word_is_tried_in_each_language(monkeypatch):
+    monkeypatch.setattr(listen, "seconds_of", lambda audio: 0.8)
+    wider = Wider("Nein", "en")
+    assert Listener(Ear("Nine"), Ear("నైన్"), wider).transcribe(b"x") == "Nein"
+    assert wider.used == 2
+
+
+def test_english_speech_doesnt_transcribe_with_the_wider_model(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "english")
+    wider = Wider("Hallo", "en")
+    assert Listener(Ear("What is the capital of France"), None, wider).transcribe(b"x") == "What is the capital of France"
+    assert wider.used == 0
+
+
+def test_known_english_doesnt_touch_the_wider_model():
+    wider = Wider("Hallo", "de")
+    assert Listener(Ear("Lock the screen."), None, wider).transcribe(b"x") == "Lock the screen."
+    assert wider.used == 0
+
+
+def test_german_misheard_as_a_known_english_command_isnt_run(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "german")
+    listener = Listener(Ear("Make the music louder.", confidence=-0.7), None, Wider("Mach die Musik leiser", "de"))
+    assert listener.transcribe(b"x") == "Mach die Musik leiser"
+
+
+def test_unsure_english_that_sounds_english_stays_english():
+    wider = Wider("Hallo", "en")
+    assert Listener(Ear("Lock the screen.", confidence=-0.9), None, wider).transcribe(b"x") == "Lock the screen."
+    assert wider.used == 0
+
+
+def test_unaddressed_speech_doesnt_reach_the_wider_model():
+    wider = Wider("Hallo", "de")
+    assert Listener(Ear("some talk in the room"), None, wider).transcribe(b"x", hands_free=True) == "some talk in the room"
+    assert wider.used == 0
+
+
+def test_a_hindi_sentence_keeps_the_wake_word(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "hindi")
+    listener = Listener(Ear("Hey Buddy our was come"), None, Wider("आवाज़ कम करो", "hi"))
+    assert listener.transcribe(b"x", hands_free=True) == "Buddy, आवाज़ कम करो"
+
+
+def test_an_unclear_hindi_note_keeps_its_low_confidence(monkeypatch):
+    monkeypatch.setattr(language, "pick", lambda english, others: "hindi")
+    listener = Listener(Ear("mumble"), None, Wider("कुछ", "hi", no_speech=0.5, confidence=-1.0))
+    assert listener.transcribe_with_confidence(b"x")[1:] == (0.5, -1.0)
+
+
+def test_short_replies_in_hindi_and_german_need_no_model(monkeypatch):
+    def refuse(*args, **kwargs):
+        raise AssertionError("asked the model")
+    monkeypatch.setattr(ai, "chat", refuse)
+    assert language.pick("Nine", {"german": "Nein."}) == "german"
+    assert language.pick("Hon", {"hindi": "हाँ"}) == "hindi"
+
+
+def test_a_language_the_recognisers_didnt_offer_isnt_accepted(monkeypatch):
+    monkeypatch.setattr(ai, "chat", lambda *args, **kwargs: '{"language": "french"}')
+    assert language.pick("Hello there", {"german": "Hallo da"}) == "english"
+
+
+def test_hindi_and_german_confirm_and_cancel(power):
+    for yes in ("हाँ", "haan", "ja", "Ja."):
+        power.clear()
+        engine = Engine()
+        say(engine, "shut down the laptop")
+        say(engine, yes)
+        assert power == ["shutdown"], yes
+    for no in ("नहीं", "nahi", "nein"):
+        power.clear()
+        engine = Engine()
+        say(engine, "shut down the laptop")
+        say(engine, no)
+        assert power == [], no
+    for stop in ("रुको", "ruko", "stopp", "aufhören"):
+        engine = Engine()
+        say(engine, stop)
+        assert engine.events[-1]["text"] == "Stopped", stop
+
+
+def test_hindi_and_german_get_a_voice_of_their_own():
+    from buddy import tts
+    assert tts.VOICES[language.written_in("आवाज़ कम करो")][1].startswith("hi_IN")
+    assert tts.VOICES[language.written_in("Die Musik ist leiser")][1].startswith("de_DE")

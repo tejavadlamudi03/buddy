@@ -5,16 +5,19 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from PIL import Image
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import actions, awake, config, guests, reminders, share, whatsapp
+from . import actions, awake, config, games, guests, models, reminders, share, whatsapp
 from .engine import Engine
-from .listen import Listener, telugu_ear
+from .listen import Listener, languages_ear, telugu_ear
 from .stt import Transcriber
 from .tts import Speaker
 
 STATIC = Path(__file__).parent / "static"
+PAGE_FILES = {"buddy3d.js", "three.module.min.js"}
+MAX_DRAWING_BYTES = 5 * 1024 * 1024
 
 
 class Command(BaseModel):
@@ -24,6 +27,10 @@ class Command(BaseModel):
 
 class ShareRequest(BaseModel):
     control: bool = False
+
+
+class ModelName(BaseModel):
+    name: str
 
 
 class Settings(BaseModel):
@@ -49,11 +56,11 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     settings = config.load()
     awake.restore()
     engine = engine or Engine(speaker=Speaker())
-    telugu = telugu_ear()
-    transcriber = transcriber or Listener(Transcriber(settings["whisper_model"]), telugu)
+    telugu, wider = telugu_ear(), languages_ear()
+    transcriber = transcriber or Listener(Transcriber(settings["whisper_model"]), telugu, wider)
     threading.Thread(target=transcriber.load, daemon=True).start()
     share.configure(engine, transcriber)
-    voice_notes = Listener(Transcriber(settings["voice_note_model"], beam_size=5, skip_silence=False), telugu)
+    voice_notes = Listener(Transcriber(settings["voice_note_model"], beam_size=5, skip_silence=False), telugu, wider)
     threading.Thread(target=voice_notes.load, daemon=True).start()
     whatsapp.start_bridge(engine, voice_notes)
     reminders.start(engine)
@@ -73,6 +80,12 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     def page():
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})  # or Chrome keeps showing an old page
 
+    @app.get("/static/{name}")
+    def page_file(name: str):
+        if name not in PAGE_FILES:
+            raise HTTPException(status_code=404)
+        return FileResponse(STATIC / name, headers={"Cache-Control": "no-cache"})
+
     @app.post("/api/command", dependencies=guarded)
     def command(body: Command):
         return {"accepted": engine.submit(body.text, body.require_wake)}
@@ -80,6 +93,18 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.post("/api/audio", dependencies=guarded)
     def audio(file: UploadFile, require_wake: bool = False):
         return hear(engine, transcriber, file.file.read(), require_wake)
+
+    @app.post("/api/game/drawing", dependencies=guarded)
+    def drawing(file: UploadFile):
+        raw = file.file.read(MAX_DRAWING_BYTES + 1)
+        if len(raw) > MAX_DRAWING_BYTES:
+            raise HTTPException(status_code=413, detail="That drawing is too big")
+        try:
+            picture = games.sketch_jpeg(raw)
+        except (OSError, ValueError, Image.DecompressionBombError):
+            raise HTTPException(status_code=400, detail="That isn't a picture") from None
+        engine.submit_drawing(picture)
+        return {"ok": True}
 
     @app.post("/api/stop", dependencies=guarded)
     def stop():
@@ -89,7 +114,8 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.get("/api/events", dependencies=guarded)
     def events(after: int = 0):
         speaking = bool(engine.speaker and engine.speaker.speaking)
-        return {"events": engine.events_after(after), "busy": engine.busy, "speaking": speaking, "listening": engine.listening()}
+        return {"events": engine.events_after(after), "busy": engine.busy, "speaking": speaking, "listening": engine.listening(),
+                "game": engine.game_status()}
 
     @app.get("/api/share", dependencies=guarded)
     def share_status():
@@ -107,6 +133,30 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     def share_stop():
         engine.emit("say", actions.run("stop_sharing"))
         return share.current.status()
+
+    @app.get("/api/models", dependencies=guarded)
+    def list_models():
+        return models.status()
+
+    @app.post("/api/models/use", dependencies=guarded)
+    def use_model(body: ModelName):
+        try:
+            return models.use(body.name)
+        except (ValueError, RuntimeError, OSError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from None
+
+    @app.post("/api/models/download", dependencies=guarded)
+    def download_model(body: ModelName):
+        try:
+            models.download.start(body.name)
+        except (ValueError, RuntimeError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from None
+        return models.status()
+
+    @app.delete("/api/models/download", dependencies=guarded)
+    def cancel_model_download():
+        models.download.cancel()
+        return {"ok": True}
 
     @app.get("/api/settings", dependencies=guarded)
     def read_settings():
