@@ -1,6 +1,7 @@
 import json
 import shutil
 import stat
+import sys
 from datetime import datetime
 
 import pytest
@@ -51,7 +52,8 @@ def test_off_until_a_password_is_set(state):
 def test_the_password_is_never_kept_in_the_clear(state):
     guests.set_password(PASSWORD)
     assert PASSWORD not in state.read_text()
-    assert stat.S_IMODE(state.stat().st_mode) == 0o600
+    if sys.platform != "win32":  # Windows keeps a profile's files to its owner with its own permissions instead
+        assert stat.S_IMODE(state.stat().st_mode) == 0o600
     assert guests.check_password(f" {PASSWORD} ")
     assert not guests.check_password("wrong one")
 

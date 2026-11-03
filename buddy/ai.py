@@ -24,7 +24,7 @@ def _url(path: str) -> str:
 
 
 def _binary() -> str | None:
-    bundled = config.DATA_DIR / "ollama/bin/ollama"
+    bundled = config.DATA_DIR / ("ollama/ollama.exe" if config.WINDOWS else "ollama/bin/ollama")
     return str(bundled) if bundled.exists() else shutil.which("ollama")
 
 
@@ -49,7 +49,7 @@ def ensure_running() -> None:
     env = {**apps.session_env(), "OLLAMA_HOST": config.load()["ai_host"],
            "OLLAMA_MODELS": str(config.DATA_DIR / "ollama/models")}
     subprocess.Popen([binary, "serve"], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True)
+                     stderr=subprocess.DEVNULL, start_new_session=True, **config.NO_WINDOW)
     deadline = time.monotonic() + 20
     while not _is_up():
         if time.monotonic() > deadline:

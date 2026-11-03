@@ -6,7 +6,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-from . import ai, config
+from . import ai, config, winsys
 
 GB = 1_000_000_000
 GPU_ROOM_GB = 1.5  # beyond the download size, for the conversation it holds in memory
@@ -40,14 +40,20 @@ def check_name(name: str) -> str:
     return name
 
 
+def _memory_kb() -> int:
+    if config.WINDOWS:
+        return round(winsys.memory_gb()[1] * 1024 ** 2)
+    return next(int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemTotal"))
+
+
 @functools.cache
 def _chips() -> tuple:
     """(graphics card name, its memory in GB, the laptop's memory in GB). These don't change while Buddy runs."""
-    memory_kb = next(int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemTotal"))
+    memory_kb = _memory_kb()
     card, video = "", 0.0
     try:
         output = subprocess.run(["nvidia-smi", "--query-gpu=memory.total,name", "--format=csv,noheader,nounits"],
-                                capture_output=True, text=True, timeout=10, check=True).stdout
+                                capture_output=True, text=True, timeout=10, check=True, **config.NO_WINDOW).stdout
         cards = sorted((float(line.split(",", 1)[0]), line.split(",", 1)[1].strip()) for line in output.splitlines() if line.strip())
         if cards:
             video, card = cards[-1][0] * 1024 * 1024 / GB, cards[-1][1]

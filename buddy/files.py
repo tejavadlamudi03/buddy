@@ -6,14 +6,15 @@ import re
 import time
 from pathlib import Path
 
-from . import config
+from . import config, winsys
 
 HOME = Path.home()
 FOLDERS = ("Downloads", "Documents", "Desktop", "Pictures", "Music", "Videos", "Screenshots")
-SKIP_DIRS = {"build", "install", "log", "node_modules", "__pycache__", "venv", "site-packages", "snap", "miniconda3"}
+SKIP_DIRS = {"build", "install", "log", "node_modules", "__pycache__", "venv", "site-packages", "snap", "miniconda3", "appdata"}
 # Never sent, read or listed. Saying a run command directly is the only way to reach these.
 PRIVATE_DIRS = (".ssh", ".gnupg", ".aws", ".config/buddy", ".local/share/buddy", ".config/google-chrome",
-                ".mozilla", ".thunderbird", "snap/firefox", "snap/thunderbird", ".claude")
+                ".mozilla", ".thunderbird", "snap/firefox", "snap/thunderbird", ".claude",
+                "AppData")  # on Windows this holds what the dot folders do: Buddy's settings, browser logins, saved passwords
 PRIVATE_NAMES = (".env", ".env.*", "id_rsa*", "id_ed25519*", "*.pem", "*.key", "credentials*", ".netrc", ".git-credentials")
 OPENABLE = ("pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "txt", "md", "png", "jpg",
             "jpeg", "gif", "mp3", "wav", "mp4", "mkv", "avi", "zip", "tar", "gz", "py", "cpp", "yaml", "yml", "json", "html")
@@ -65,7 +66,7 @@ def find(query: str, limit: int = 8) -> list[Path]:
         return []
     deadline = time.monotonic() + SEARCH_SECONDS
     found = {}
-    for root in [HOME / folder for folder in FOLDERS] + [HOME]:
+    for root in [folder_path(folder) for folder in FOLDERS] + [HOME]:
         if not root.is_dir():
             continue
         for path in _walk(root, deadline):
@@ -80,7 +81,13 @@ def find(query: str, limit: int = 8) -> list[Path]:
 
 
 def folder_path(name: str) -> Path:
-    return HOME if name == "home" else HOME / name.capitalize()
+    if name == "home":
+        return HOME
+    if config.WINDOWS:
+        if name.lower() == "screenshots":
+            return folder_path("pictures") / "Screenshots"
+        return winsys.known_folder(name.lower()) or HOME / name.capitalize()
+    return HOME / name.capitalize()
 
 
 def newest(folder: Path, limit: int = 15) -> list[Path]:

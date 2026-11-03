@@ -8,10 +8,9 @@ view-only unless control is explicitly allowed.
 import atexit
 import base64
 import hashlib
+import io
 import re
-import os
 import secrets
-import signal
 import subprocess
 import threading
 import time
@@ -24,12 +23,16 @@ import qrcode.image.svg
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
+from PIL import Image, ImageDraw
 from pydantic import BaseModel, Field
 
-from . import apps, config, desktop
+from . import apps, config, desktop, winsys
 
 CLOUDFLARED_URL = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64"
 CLOUDFLARED_SHA256 = "1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872"
+if config.WINDOWS:
+    CLOUDFLARED_URL = "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-windows-amd64.exe"
+    CLOUDFLARED_SHA256 = "2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343"
 STATIC = Path(__file__).parent / "static"
 TUNNEL_URL = re.compile(r"https://[\w-]+\.trycloudflare\.com")
 MIN_FRAME_SECONDS = 0.15
@@ -39,7 +42,7 @@ MAX_SHARE_SECONDS = 12 * 3600
 
 
 def _cloudflared() -> Path:
-    path = config.DATA_DIR / "bin/cloudflared"
+    path = config.DATA_DIR / ("bin/cloudflared.exe" if config.WINDOWS else "bin/cloudflared")
     if path.exists():
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +55,15 @@ def _cloudflared() -> Path:
     download.chmod(0o700)
     download.rename(path)
     return path
+
+
+def _locked_picture() -> bytes:
+    """What the phone shows instead, as Windows hides the screen from every program until someone signs in."""
+    image = Image.new("RGB", (800, 450), "black")
+    ImageDraw.Draw(image).text((60, 215), "The laptop is locked. Windows hides the screen until someone signs in.", fill="white")
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=60)
+    return buffer.getvalue()
 
 
 @dataclass
@@ -123,6 +135,9 @@ class Share:
 
     def _keep_awake(self) -> None:
         """A sleeping laptop can't be reached, and nobody is there to wake it."""
+        if config.WINDOWS:  # the screen too: if it times out and locks, Windows hides it from the share
+            self._awake = winsys.keep_awake(MAX_SHARE_SECONDS, screen=True)
+            return
         self._awake = subprocess.Popen(
             ["systemd-inhibit", "--what=sleep:handle-lid-switch", "--who=Buddy",
              "--why=Your screen is being shared", "sleep", "infinity"],
@@ -164,7 +179,7 @@ class Share:
             self._server.should_exit = True
         if self._awake:
             try:
-                os.killpg(self._awake.pid, signal.SIGTERM)
+                apps.end_tree(self._awake.pid)
             except ProcessLookupError:
                 pass
         self._timer = self._tunnel = self._server = self._awake = None
@@ -181,10 +196,14 @@ class Share:
 
     def _start_tunnel(self, port: int) -> str:
         # An empty config keeps any personal cloudflared setup from changing where this points.
+        empty_config = "/dev/null"
+        if config.WINDOWS:
+            empty_config = config.DATA_DIR / "bin/cloudflared-empty.yml"
+            empty_config.write_text("")
         self._tunnel = subprocess.Popen(
-            [str(_cloudflared()), "tunnel", "--no-autoupdate", "--config", "/dev/null",
+            [str(_cloudflared()), "tunnel", "--no-autoupdate", "--config", str(empty_config),
              "--url", f"http://127.0.0.1:{port}"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=apps.session_env(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, errors="replace", env=apps.session_env(), **config.NO_WINDOW,
         )
         found = {}
         ready = threading.Event()
@@ -219,7 +238,7 @@ class Share:
         """One capture serves every viewer, at a capped rate."""
         with session.frame_lock:
             if time.monotonic() - session.frame_time >= MIN_FRAME_SECONDS:
-                session.frame = desktop.frame_jpeg()
+                session.frame = _locked_picture() if config.WINDOWS and winsys.is_locked() else desktop.frame_jpeg()
                 session.frame_time = time.monotonic()
             return session.frame
 

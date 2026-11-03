@@ -6,7 +6,7 @@ Nothing leaves this machine.
 import json
 import re
 
-from . import actions, ai, desktop, ocr
+from . import actions, ai, config, desktop, ocr
 from .ai import extract_json
 
 # Sharing the screen and power actions are deliberately absent: text on a web page
@@ -20,7 +20,7 @@ AGENT_ACTIONS = {
     "read_file", "send_file", "send_message", "system_report", "run_readonly",
 }
 TERMINALS = re.compile(r"terminal|konsole|xterm|alacritty|kitty|tilix|terminator", re.I)
-TERMINAL_REQUEST = re.compile(r"terminal|command|shell|bash|script|\brun\b|install|\bgit\b|\bpip\b|\bapt\b", re.I)
+TERMINAL_REQUEST = re.compile(r"terminal|command|shell|bash|powershell|script|\brun\b|install|\bgit\b|\bpip\b|\bapt\b|\bwinget\b", re.I)
 # Typing lands in whatever has focus, so the request itself must be about writing something.
 TYPING_REQUEST = re.compile(r"\b(?:type|write|enter|fill|search|message|email|mail|reply|compose|note|draft|rename|comment|post)\b", re.I)
 CODE_EDITORS = re.compile(r"vscode|code\b|cursor|sublime|pycharm", re.I)
@@ -95,6 +95,11 @@ Rules:
 - Never type passwords or payment details. Ask the user to do it.
 - Use a terminal only when the user's request asks for it. Ask before any command that
   deletes data, installs software or uses sudo."""
+if config.WINDOWS:
+    SYSTEM_PROMPT = (SYSTEM_PROMPT.replace("a Linux GNOME desktop", "a Windows desktop")
+                     .replace('{"action":"run_readonly","command":"df -h"}  ls, df, du, free, uptime, ps and similar look-only commands',
+                              '{"action":"run_readonly","command":"tasklist"}  whoami, hostname, tasklist, systeminfo, driverquery, where, nvidia-smi: look-only commands')
+                     .replace("installs software or uses sudo", "installs software or needs administrator rights"))
 
 
 def _execute(step: dict, task: str, scale: float, left: int, top: int, items: tuple = ()) -> str:

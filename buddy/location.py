@@ -10,7 +10,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 
-from . import apps
+from . import apps, config, winsys
 
 LOOKUP_URL = "https://api.beacondb.net/v1/geolocate"
 USER_AGENT = "Buddy-voice-control/1.0"  # beaconDB asks every client to identify itself
@@ -42,18 +42,23 @@ class Place:
         return f"Accurate to about {self.metres / 1000:.0f} km"
 
 
-def nearby_networks() -> list[dict]:
-    """The strongest networks in range, leaving out any that opted out or may be moving around."""
+def _in_range() -> list[tuple[str, str, int]]:
+    """(name, address, signal from 0 to 100) of each network."""
+    if config.WINDOWS:
+        return winsys.wifi_networks()
     try:
         listing = subprocess.run(["nmcli", "-t", "-f", "SSID,BSSID,SIGNAL", "device", "wifi", "list"],
                                  capture_output=True, text=True, timeout=SCAN_SECONDS, env=apps.session_env()).stdout
     except (OSError, subprocess.SubprocessError):
         return []
+    return [(match.group(1), match.group(2).replace("\\", "").lower(), int(match.group(3)))
+            for match in map(_NETWORK.fullmatch, listing.splitlines()) if match]
+
+
+def nearby_networks() -> list[dict]:
+    """The strongest networks in range, leaving out any that opted out or may be moving around."""
     networks = []
-    for line in listing.splitlines():
-        if not (match := _NETWORK.fullmatch(line)):
-            continue
-        name, address, signal = match.group(1), match.group(2).replace("\\", "").lower(), int(match.group(3))
+    for name, address, signal in _in_range():
         if name.endswith("_nomap") or int(address[:2], 16) & 2:  # asks not to be mapped, or a made-up address like a phone's
             continue
         networks.append({"macAddress": address, "signalStrength": signal // 2 - 100})  # nmcli gives 0-100, this wants dBm
@@ -77,4 +82,4 @@ def find() -> Place:
 
 
 def message(place: Place) -> str:
-    return f"The laptop's location at {datetime.now():%-I:%M %p}:\n{place.link}\n{place.accuracy}."
+    return f"The laptop's location at {config.clock(datetime.now())}:\n{place.link}\n{place.accuracy}."

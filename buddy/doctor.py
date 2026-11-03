@@ -3,14 +3,18 @@ import os
 import shutil
 from pathlib import Path
 
-from . import ai, config, files, listen
+from . import ai, apps, config, files, listen
 
 
 def _tools() -> list:
     wanted = {"ffmpeg": "converting audio and video", "soffice": "converting and reading documents",
-              "pdftotext": "reading PDFs", "pdftoppm": "reading scanned PDFs", "google-chrome": "WhatsApp and websites",
-              "pw-play": "speaking aloud"}
-    return [(bool(shutil.which(tool)), tool, use) for tool, use in wanted.items()]
+              "pdftotext": "reading PDFs", "pdftoppm": "reading scanned PDFs"}
+    if not config.WINDOWS:
+        wanted |= {"google-chrome": "WhatsApp and websites", "pw-play": "speaking aloud"}
+    tools = [(bool(shutil.which(apps.tool(tool))), tool, use) for tool, use in wanted.items()]
+    if config.WINDOWS:
+        tools.append((bool(apps.browser()), "Chrome or Edge", "WhatsApp and websites"))
+    return tools
 
 
 def _desktop() -> tuple:

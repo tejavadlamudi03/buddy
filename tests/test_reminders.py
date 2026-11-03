@@ -1,3 +1,4 @@
+import sys
 import threading
 import time
 from datetime import datetime
@@ -111,6 +112,7 @@ def test_listing_and_cancelling():
     assert reminders.upcoming() == []
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows keeps a profile's files to its owner with its own permissions")
 def test_private_file_permissions():
     reminders.add(1.0, "x")
     assert reminders.FILE.stat().st_mode & 0o077 == 0

@@ -54,12 +54,12 @@ def clock_time(hour: int, minute: int = 0, meridiem: str = "", day: str = "", no
 
 def spoken(moment: datetime, now: datetime | None = None) -> str:
     now = now or datetime.now()
-    clock = f"{moment:%-I:%M %p}"
+    clock = config.clock(moment)
     if moment.date() == now.date():
         return f"at {clock}"
     if moment.date() == (now + timedelta(days=1)).date():
         return f"tomorrow at {clock}"
-    return f"on {moment:%A %-d %B} at {clock}"
+    return f"on {moment:%A} {moment.day} {moment:%B} at {clock}"
 
 
 def add(when: float, text: str, whatsapp_only: bool = False) -> None:

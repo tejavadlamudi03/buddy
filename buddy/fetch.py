@@ -4,7 +4,6 @@ import mimetypes
 import os
 import re
 import shutil
-import signal
 import subprocess
 import tempfile
 import threading
@@ -17,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from . import apps, files
+from . import apps, config, files
 
 MAX_DOWNLOAD_BYTES = 5 * 1000 * 1000 * 1000
 KEEP_FREE_BYTES = 1000 * 1000 * 1000
@@ -39,9 +38,16 @@ class Cancelled(RuntimeError):
         super().__init__("Stopped")
 
 
+RESERVED_ON_WINDOWS = re.compile(r"con|prn|aux|nul|com\d|lpt\d", re.I)
+
+
 def _safe_name(name: str) -> str:
     """The server chooses this name, so it never gets to choose a folder or a hidden file."""
     name = re.sub(r"[\x00-\x1f/\\]", "_", Path(name.replace("\\", "/")).name).strip(" .")
+    if config.WINDOWS:  # a colon would write to a hidden stream of another file, and "NUL.txt" to nowhere at all
+        name = re.sub(r'[<>:"|?*]', "_", name).strip(" .")
+        if RESERVED_ON_WINDOWS.fullmatch(name.split(".")[0]):
+            name = f"_{name}"
     if len(name) > 120:
         stem, suffix = os.path.splitext(name)
         name = stem[:120 - len(suffix)] + suffix
@@ -118,7 +124,7 @@ def save_received(name: str, data: bytes) -> Path:
 def _tool(*command: str) -> None:
     """Runs a converter so that Stop can end it, along with anything it started."""
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                               env=apps.session_env(), start_new_session=True)
+                               env=apps.session_env(), start_new_session=True, **config.NO_WINDOW)
     deadline = time.monotonic() + CONVERT_SECONDS
     try:
         while process.poll() is None:
@@ -129,7 +135,7 @@ def _tool(*command: str) -> None:
             time.sleep(0.1)
     finally:
         if process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
+            apps.end_tree(process.pid, force=True)
             process.wait()
 
 
@@ -160,7 +166,7 @@ def _pdf_pages(source: Path, wanted: str, folder: Path) -> Path:
 
 def _office(source: Path, wanted: str, folder: Path) -> Path:
     # Its own profile, because with LibreOffice already open the job would go there and leave nothing here.
-    command = ["soffice", f"-env:UserInstallation=file://{folder}/profile", "--headless", "--norestore"]
+    command = [apps.tool("soffice"), f"-env:UserInstallation={(Path(folder) / 'profile').as_uri()}", "--headless", "--norestore"]
     if source.suffix.lower() == ".pdf":
         command.append("--infilter=writer_pdf_import")
     _tool(*command, "--convert-to", wanted, "--outdir", str(folder), str(source))

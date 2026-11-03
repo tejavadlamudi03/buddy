@@ -1,3 +1,4 @@
+import sys
 import time
 
 import pytest
@@ -223,6 +224,9 @@ def test_launched_apps_do_not_inherit_ros_or_buddys_env(monkeypatch):
     monkeypatch.setenv("DISPLAY", ":1")
     monkeypatch.setattr("subprocess.run", lambda *a, **k: (_ for _ in ()).throw(OSError()))  # no session available
     env = apps.session_env()
+    if sys.platform == "win32":  # there's no session to take a clean environment from, so only what breaks programs goes
+        assert not {"QT_QPA_PLATFORM_PLUGIN_PATH", "ELECTRON_RUN_AS_NODE"} & set(env)
+        return
     assert env["DISPLAY"] == ":1"
     assert not {"LD_LIBRARY_PATH", "ROS_DISTRO", "QT_QPA_PLATFORM_PLUGIN_PATH", "ELECTRON_RUN_AS_NODE", "SECRET_TOKEN"} & set(env)
 
@@ -315,6 +319,7 @@ def test_agent_can_never_unlock():
     assert _execute({"action": "unlock_screen"}, "unlock", 1.0, 0, 0).startswith("refused")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows can't be unlocked by an app")
 def test_a_display_wake_failure_never_turns_an_unlock_into_an_error(monkeypatch):
     states = iter([True, False])
     monkeypatch.setattr(actions, "is_locked", lambda: next(states))

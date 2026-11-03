@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -85,6 +86,7 @@ def test_the_ai_cannot_run_arbitrary_commands():
     assert agent._execute({"action": "run_command", "command": "ls"}, "run ls", 1.0, 0, 0).startswith("refused")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="bash syntax; PowerShell is tested in test_windows_live.py")
 def test_run_command_reports_failure_and_output():
     assert actions.run("run_command", command="echo hi") == "hi"
     assert actions.run("run_command", command="echo bad >&2; exit 3").startswith("Exit code 3")

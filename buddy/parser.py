@@ -340,6 +340,15 @@ def _parse_clause(clause: str, ctx: Context) -> list[Step] | None:
             return [step("open", name=target, search_fallback=False)]
         return [step("run_command", command=target)]
 
+    if match := re.fullmatch(r"(?:please )?add (?:the (?:word|name) )?(.+?) to (?:my |the )?(?:dictionary|vocabulary)", text.strip(" .!"), re.I):
+        return [step("add_to_dictionary", word=match.group(1))]
+    if match := re.fullmatch(r"(?:please )?(?:remove|delete) (?:the (?:word|name) )?(.+?) from (?:my |the )?(?:dictionary|vocabulary)", text.strip(" .!"), re.I):
+        return [step("remove_from_dictionary", word=match.group(1))]
+    if re.fullmatch(r"(?:show(?: me)?|list|read(?: out)?|what(?:'s| is) in) (?:my |the )?(?:dictionary|vocabulary)", low):
+        return [step("list_dictionary")]
+    if match := re.fullmatch(r"(?:turn|switch) (on|off) (?:the )?dictation|(enable|disable) (?:the )?dictation", low):
+        return [step("set_dictation", on=(match.group(1) or match.group(2)) in ("on", "enable"))]
+
     if re.fullmatch(LOCATION, low):  # before files, or "send me my location" looks for a file called location
         return [step("share_location")]
     if match := re.fullmatch(VOICE_STYLE, low):
