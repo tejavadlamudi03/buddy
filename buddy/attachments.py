@@ -55,8 +55,7 @@ def _pdf(path: Path) -> Attachment:
     if len(text.strip()) >= MIN_PDF_TEXT:
         return _with_text(path.name, text)
     with tempfile.TemporaryDirectory(prefix="buddy-read-") as folder:
-        subprocess.run(["pdftoppm", "-jpeg", "-r", "110", "-f", "1", "-l", str(MAX_PAGES_AS_PICTURES), str(path), f"{folder}/page"],
-                       capture_output=True, timeout=120, env=apps.session_env(), stdin=subprocess.DEVNULL, **config.NO_WINDOW)
+        _output("pdftoppm", "-jpeg", "-r", "110", "-f", "1", "-l", str(MAX_PAGES_AS_PICTURES), str(path), f"{folder}/page")
         pictures = []
         for page in sorted(Path(folder).glob("page*")):
             with Image.open(page) as image:

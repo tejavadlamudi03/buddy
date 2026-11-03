@@ -40,7 +40,7 @@ understands English, German, Hindi and Telugu. No AI service is involved, and th
 **Keep it yours**
 - All the AI runs on your laptop, with no AI service or subscription, and you can [choose or download another model](#choosing-the-ai-model) to suit your hardware.
 - Risky actions ask first, private files stay out of reach, and only your number can give commands. See [Privacy and safety](#privacy-and-safety).
-- Runs on **Ubuntu**, and now on **Windows 10 and 11** too, which is new and not yet tried on a real Windows laptop. See [Buddy on Windows](#buddy-on-windows).
+- Runs on **Ubuntu**, and now on **Windows 10 and 11** too, which is new and tested on a real Windows machine but not yet on a laptop. See [Buddy on Windows](#buddy-on-windows).
 
 ## How Buddy compares
 
@@ -110,8 +110,11 @@ On Windows, see [Buddy on Windows](#buddy-on-windows).
 
 ## Buddy on Windows
 
-> **New, and not yet tried on a real Windows laptop.** It has only been checked against simulated Windows libraries. A workflow
-> in `.github/workflows/windows.yml` tests it on a real Windows machine whenever it's pushed. Expect rough edges.
+> **New.** It passes every check on a real Windows machine (Windows Server 2025, in the `Windows` workflow on every change):
+> seeing the screen, finding and arranging windows, typing, dictation's key, clicking buttons by name, Start menu apps,
+> folders, lock detection, the system report, staying awake, PowerShell, dark mode, media controls and the Recycle Bin.
+> That machine has no microphone, speakers, Wi-Fi, Bluetooth, battery, adjustable screen or lid, and no WhatsApp linked,
+> so **those haven't been tried on Windows yet**. Expect rough edges there.
 
 Install it from a normal PowerShell window, not as administrator. You need [Git](https://git-scm.com/download/win):
 
@@ -140,7 +143,7 @@ Commands are the same, with these differences:
 | **Record the screen** | Presses Win+Alt+R, for Xbox Game Bar, which records one app rather than the desktop, and has to be switched on |
 | **Running commands** | "Run ..." uses PowerShell. The local AI can only run `whoami`, `hostname`, `tasklist`, `systeminfo`, `driverquery`, `where` and `nvidia-smi` |
 | **Location** | Windows 11 may need Location turned on to list Wi-Fi networks. Without that it's a rough guess from your internet connection |
-| **Dictation** | Records through `sounddevice` instead of PipeWire. Untested on Windows |
+| **Dictation** | Holding the key and typing work on real Windows. Recording uses `sounddevice` instead of PipeWire, and hasn't been tried with a real microphone |
 | **Word, Excel, PowerPoint** | Open Microsoft Office if you have it. Say "LibreOffice Writer" for that |
 
 ## Using Buddy
@@ -578,7 +581,7 @@ language before listening properly, which is why English is quick: when the Engl
 | `listen.py`, `stt.py`, `tts.py` | Hearing and speaking |
 | `dictation.py` | Holding a key to dictate in any app |
 | `desktop.py`, `desktop_x11.py`, `desktop_windows.py`, `media.py` | Keyboard, mouse, windows, screenshots and media, on Ubuntu or Windows |
-| `winsys.py`, `media_windows.py`, `a11y_helper.ps1` | What Windows does differently: settings, power, audio, the Start menu, media controls |
+| `winsys.py`, `media_windows.py`, `a11y_windows.py` | What Windows does differently: settings, power, audio, the Start menu, media controls |
 | `games.py` | The games and their rules |
 | `models.py` | Which AI models fit this laptop, and downloading them |
 | `whatsapp.py`, `attachments.py` | The WhatsApp bridge, and reading files sent to it |

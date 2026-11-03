@@ -12,9 +12,11 @@ def no_real_agent(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def no_real_folders(monkeypatch):
-    """On Windows, folders are looked up from the system, which would bypass a test's own home folder."""
-    monkeypatch.setattr("buddy.winsys.known_folder", lambda name: None)
+def no_real_folders(request, monkeypatch):
+    """On Windows, folders are looked up from the system, which would bypass a test's own home folder.
+    The live Windows tests run on a throwaway machine, and check that lookup itself."""
+    if not request.module.__name__.endswith("test_windows_live"):
+        monkeypatch.setattr("buddy.winsys.known_folder", lambda name: None)
 
 
 @pytest.fixture(autouse=True)

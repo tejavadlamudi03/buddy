@@ -204,6 +204,25 @@ def test_agent_prompt_has_nothing_only_true_on_linux():
         assert wanted in agent.SYSTEM_PROMPT or config.WINDOWS
 
 
+def test_buttons_go_through_ui_automation_on_windows(on_windows, monkeypatch):
+    from buddy import a11y
+    pressed = []
+    fake = types.SimpleNamespace(press=lambda pid, names: pressed.append(names) or names[1], names=lambda pid: ["Equals"])
+    monkeypatch.setattr(a11y, "a11y_windows", fake, raising=False)
+    assert a11y.press(7, "=")
+    assert pressed == [["=", "calculate result", "equals"]]
+    assert a11y.names(7) == ["Equals"]
+
+
+def test_a_ui_automation_failure_means_nothing_to_press(on_windows, monkeypatch):
+    from buddy import a11y
+
+    def broken(*args):
+        raise OSError("the app closed")
+    monkeypatch.setattr(a11y, "a11y_windows", types.SimpleNamespace(press=broken, names=broken), raising=False)
+    assert a11y.press(7, "Save") is False and a11y.names(7) == []
+
+
 def test_gnome_shortcuts_become_windows_ones(monkeypatch):
     pressed = []
     fake = types.SimpleNamespace(press=pressed.append, release=lambda key: None)
@@ -275,7 +294,7 @@ def test_scripts_for_windows_are_plain_text():
     """Windows PowerShell misreads any other character in a file with no byte order mark."""
     root = Path(config.__file__).parent.parent
     scripts = [*root.glob("scripts/*.ps1"), *root.glob("buddy/*.ps1")]
-    assert len(scripts) == 5
+    assert len(scripts) == 4
     for script in scripts:
         script.read_bytes().decode("ascii")
 
