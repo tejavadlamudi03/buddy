@@ -52,6 +52,9 @@ WINDOWS_SPOKEN_NAMES = {
 # Packaged apps have no shortcut to read their program's name from.
 WINDOWS_PROGRAMS = {"file explorer": "explorer", "terminal": "windowsterminal", "windows terminal": "windowsterminal",
                     "microsoft edge": "msedge", "command prompt": "cmd"}
+# On Windows, what's left out of Buddy's own environment for the programs it starts: OCR's Qt path crashes other
+# Qt apps, the Electron flag stops VS Code opening, and the Python ones confuse any other Python.
+BREAKS_PROGRAMS = {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "QT_QPA_PLATFORM_PLUGIN_PATH", "QT_PLUGIN_PATH", "ELECTRON_RUN_AS_NODE"}
 START_MENU_SECONDS = 300  # it takes a second or two to read, and is asked for on every "open"
 _start_menu = (0.0, [])
 
@@ -90,7 +93,7 @@ def session_env() -> dict:
     ROS setup clashes with app libraries, and a parent shell may hold secrets.
     """
     if config.WINDOWS:  # no session to ask, and programs there can't start without most of what's set
-        return {key: value for key, value in os.environ.items() if key.upper() not in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV")}
+        return {key: value for key, value in os.environ.items() if key.upper() not in BREAKS_PROGRAMS}
     try:
         lines = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True,
                                text=True, timeout=5, check=True).stdout.splitlines()

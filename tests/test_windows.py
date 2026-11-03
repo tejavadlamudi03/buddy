@@ -558,8 +558,17 @@ def test_closing_asks_politely(desktop_windows, monkeypatch):
     assert user32.posted == [(1, desktop_windows.WM_CLOSE, 0, 0)]  # so an app can still ask about unsaved work
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the X11 side needs Linux")
 def test_both_desktops_offer_the_same_functions(desktop_windows):
     from buddy import desktop_x11
     names = ("activate", "active_window", "close", "list_windows", "maximize", "minimize", "window_pid", "window_rect")
     for name in names:
         assert callable(getattr(desktop_windows, name)) and callable(getattr(desktop_x11, name))
+
+
+@pytest.mark.parametrize("module", ["engine", "listen", "doctor", "dictation", "actions", "server", "__main__", "whatsapp"])
+def test_every_entry_point_imports_on_its_own(module):
+    """buddy check loads the engine first, which once failed when actions needed dictation, which needs the engine."""
+    import subprocess
+    done = subprocess.run([sys.executable, "-c", f"import buddy.{module}"], capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0, done.stderr[-800:]

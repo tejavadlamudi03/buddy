@@ -2,7 +2,11 @@ import os
 import subprocess
 from pathlib import Path
 
+import sys
+
 import pytest
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="tests the bash installer")
 
 SCRIPT = Path(__file__).parent.parent / "scripts/install.sh"
 

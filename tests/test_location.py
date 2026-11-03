@@ -3,6 +3,8 @@ import json
 import subprocess
 import urllib.error
 
+import sys
+
 import pytest
 
 from buddy import actions, agent, config, location, whatsapp
@@ -42,6 +44,7 @@ def test_phrases(said):
     assert parse(said) == [{"action": "share_location"}]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows lists networks with netsh")
 def test_networks_are_read_from_nmcli_and_strongest_come_first(monkeypatch):
     listing(monkeypatch, "Home:A0\\:BB\\:CC\\:00\\:00\\:01:50\nCafe\\:Free:A8\\:BB\\:CC\\:00\\:00\\:02:90\n:A4\\:BB\\:CC\\:00\\:00\\:03:20\n")
     assert location.nearby_networks() == [
@@ -51,6 +54,7 @@ def test_networks_are_read_from_nmcli_and_strongest_come_first(monkeypatch):
     ]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows lists networks with netsh, tested in test_windows.py")
 def test_opted_out_and_made_up_addresses_are_never_sent(monkeypatch):
     listing(monkeypatch, "Mine_nomap:A8\\:BB\\:CC\\:00\\:00\\:01:90\nPhone:DA\\:BB\\:CC\\:00\\:00\\:02:90\n"
                          "One:A8\\:BB\\:CC\\:00\\:00\\:03:80\nTwo:A4\\:BB\\:CC\\:00\\:00\\:04:70\n")

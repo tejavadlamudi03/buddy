@@ -566,6 +566,7 @@ class Bridge:
                     raise RuntimeError(f"the voice note didn't load in time: {page.evaluate(AUDIO_DIAGNOSIS)}")
                 page.wait_for_timeout(200)
         audio = base64.b64decode(found["data"])
+        config.DATA_DIR.mkdir(parents=True, exist_ok=True)
         (config.DATA_DIR / "last-voice-note.ogg").write_bytes(audio)  # for checking by ear what Whisper received
         print(f"Voice note audio: {found['type']}, {found['size']} bytes, from {found['source']}, "
               f"times on the note {labels}, {_audio_levels(audio)}", flush=True)

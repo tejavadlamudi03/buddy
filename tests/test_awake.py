@@ -1,5 +1,6 @@
 import os
 import signal
+import sys
 import time
 
 import pytest
@@ -71,6 +72,7 @@ def test_never_more_than_a_day(block):
     assert awake.start(10 * awake.MAX_SECONDS) <= time.time() + awake.MAX_SECONDS
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="ends the block as a Linux process group")
 def test_restore_after_the_block_died(block):
     awake.start(60)
     state = awake._read()

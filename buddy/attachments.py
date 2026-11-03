@@ -43,8 +43,11 @@ def _picture(path: Path) -> Attachment:
 
 
 def _output(*command: str) -> str:
-    return subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace", timeout=120,
-                          env=apps.session_env(), stdin=subprocess.DEVNULL, **config.NO_WINDOW).stdout
+    try:
+        return subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace", timeout=120,
+                              env=apps.session_env(), stdin=subprocess.DEVNULL, **config.NO_WINDOW).stdout
+    except FileNotFoundError:  # Poppler, which Windows doesn't come with
+        raise ValueError(f"I couldn't read that, because {command[0]} isn't installed. Run Buddy's install script again") from None
 
 
 def _pdf(path: Path) -> Attachment:

@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import a11y, apps, awake, config, desktop, dictation, fetch, files, guests, location, media, ocr, reminders, share, whatsapp, winsys
+from . import a11y, apps, awake, config, desktop, fetch, files, guests, location, media, ocr, reminders, share, whatsapp, winsys
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -686,9 +686,10 @@ def set_voice(style: str) -> str:
 
 @action
 def set_dictation(on: bool) -> str:
+    from .dictation import key_label  # here, as dictation needs the engine, which needs this module
     settings = {**config.load(), "dictation": on}
     config.save(settings)
-    return f"Dictation is on. Hold {dictation.key_label(settings['dictation_key'])} in any app and speak" if on else "Dictation is off"
+    return f"Dictation is on. Hold {key_label(settings['dictation_key'])} in any app and speak" if on else "Dictation is off"
 
 
 @action

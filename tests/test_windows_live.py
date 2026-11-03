@@ -51,15 +51,44 @@ def test_the_window_list_and_focus(notepad):
     assert width > 100 and height > 100
 
 
+def _copied_text(window) -> str:
+    """What the window holds, read back the way a person would check: select it all and copy it."""
+    desktop.activate(window.id)
+    time.sleep(0.3)
+    desktop.press_keys("ctrl+a")
+    desktop.press_keys("ctrl+c")
+    time.sleep(0.3)
+    return subprocess.run(["powershell", "-NoProfile", "-Command", "Get-Clipboard"], capture_output=True, encoding="utf-8",
+                          errors="replace", timeout=30).stdout
+
+
 def test_typing_reaches_the_window(notepad):
     desktop.activate(notepad.id)
     time.sleep(0.5)
     desktop.type_text("hello from buddy")
-    assert _wait_for(lambda: "*" in desktop.active_window().title or "hello" in a11y_text(notepad), 5) is not None
+    assert "hello from buddy" in _copied_text(notepad)
 
 
-def a11y_text(window) -> str:
-    return " ".join(a11y.names(desktop.window_pid(window.id)))
+def test_holding_the_key_dictates_into_the_window(notepad, monkeypatch):
+    """The real keyboard hook and typing, with the microphone and speech model stood in for, as this machine has neither."""
+    import types
+    from buddy import dictation
+    monkeypatch.setattr(dictation.ai, "installed", lambda: False)
+    recorder = types.SimpleNamespace(start=lambda: None, stop=lambda: b"audio", cancel=lambda: None)
+    ear = types.SimpleNamespace(transcribe_with_confidence=lambda audio: ("um dictated on windows", 0.0, -0.2))
+    listener = types.SimpleNamespace(english=ear, telugu=None, wider=None)
+    flow = dictation.Dictation(types.SimpleNamespace(emit=lambda *a, **k: None, submit=lambda text: None), listener, recorder)
+    from pynput.keyboard import Listener
+    Listener(on_press=flow.hotkey.press, on_release=flow.hotkey.release, daemon=True).start()  # the conftest blocks flow.start
+    desktop.activate(notepad.id)
+    time.sleep(0.5)
+    from pynput.keyboard import Controller, Key
+    keys = Controller()
+    keys.press(Key.ctrl_r)
+    time.sleep(1)
+    keys.release(Key.ctrl_r)
+    time.sleep(3)
+    assert "Dictated on windows." in _copied_text(notepad)
 
 
 def test_maximize_minimize_close(notepad):
@@ -71,7 +100,12 @@ def test_maximize_minimize_close(notepad):
 
 
 def test_buttons_can_be_pressed_by_name(notepad):
-    assert a11y.names(desktop.window_pid(notepad.id)), "nothing on the accessibility tree"
+    pid = desktop.window_pid(notepad.id)
+    started = time.monotonic()
+    done = subprocess.run([*a11y.WINDOWS_HELPER, str(pid), "list"], capture_output=True, encoding="utf-8", errors="replace", timeout=60)
+    took = time.monotonic() - started
+    assert '"items"' in done.stdout, (f"{took:.1f}s", done.stdout[-500:], done.stderr[-1500:])
+    assert a11y.names(pid), f"the helper answered in {took:.1f}s but Buddy got nothing"
 
 
 def test_the_start_menu_has_apps():

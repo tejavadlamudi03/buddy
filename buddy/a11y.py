@@ -21,7 +21,7 @@ def _ask(pid: int, *args: str) -> dict:
     try:
         helper = WINDOWS_HELPER if config.WINDOWS else [SYSTEM_PYTHON, str(HELPER)]
         done = subprocess.run([*helper, str(pid), *args], capture_output=True, encoding="utf-8", errors="replace",
-                              timeout=8, env=session_env(), **config.NO_WINDOW)
+                              timeout=30 if config.WINDOWS else 8, env=session_env(), **config.NO_WINDOW)
         return json.loads(done.stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
         return {}

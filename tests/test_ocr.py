@@ -1,3 +1,7 @@
+import sys
+
+import pytest
+
 from buddy.apps import App
 from buddy.ocr import Item, find
 from pathlib import Path
@@ -25,6 +29,7 @@ def test_symbols_can_be_found():
     assert find([Item("7", 1, 1), Item("=", 3, 3)], "=").x == 3
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="X11 window classes; Windows matches by program, in test_windows.py")
 def test_windows_match_their_own_app_only():
     writer = App("LibreOffice Writer", Path("libreoffice-writer.desktop"), "libreoffice-writer", "libreoffice")
     calc = App("LibreOffice Calc", Path("libreoffice-calc.desktop"), "libreoffice-calc", "libreoffice")
