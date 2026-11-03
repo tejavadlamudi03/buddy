@@ -7,20 +7,25 @@ param([int]$AppPid, [string]$Mode, [Parameter(ValueFromRemainingArguments)][stri
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $Auto = [System.Windows.Automation.AutomationElement]
 $MaxNodes = 4000
+$script:Seen = 0
+$script:Named = 0
+$script:FirstError = $null
 
 function Get-Pressable($Root) {
     $condition = [System.Windows.Automation.Condition]::TrueCondition
-    $seen = 0
     foreach ($node in $Root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)) {
-        if ($seen++ -ge $MaxNodes) { break }
+        if ($script:Seen++ -ge $MaxNodes) { break }
         try {
             $name = $node.Current.Name
+            if ($name) { $script:Named++ }
             if ($name -and -not $node.Current.IsOffscreen -and (
                     $node.GetCurrentPropertyValue($Auto::IsInvokePatternAvailableProperty) -or
                     $node.GetCurrentPropertyValue($Auto::IsTogglePatternAvailableProperty))) {
                 $node
             }
-        } catch {}  # nodes vanish while the tree is being walked
+        } catch {  # nodes vanish while the tree is being walked
+            if (-not $script:FirstError) { $script:FirstError = $_.Exception.Message }
+        }
     }
 }
 
@@ -40,7 +45,9 @@ if ($apps.Count -eq 0) {
 }
 $items = @(foreach ($app in $apps) { Get-Pressable $app })
 if ($Mode -eq 'list') {
-    @{items = @($items | ForEach-Object { @{name = $_.Current.Name; role = $_.Current.LocalizedControlType} })} | ConvertTo-Json -Compress -Depth 3
+    # seen, named and error say why a list came back empty
+    @{items = @($items | ForEach-Object { @{name = $_.Current.Name; role = $_.Current.LocalizedControlType} })
+      apps = $apps.Count; seen = $script:Seen; named = $script:Named; error = $script:FirstError} | ConvertTo-Json -Compress -Depth 3
     exit
 }
 foreach ($wanted in $Names) {
