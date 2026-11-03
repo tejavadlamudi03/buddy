@@ -9,7 +9,7 @@ from PIL import Image
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import actions, awake, config, games, guests, models, reminders, share, whatsapp
+from . import actions, awake, config, dictation, games, guests, models, reminders, share, whatsapp
 from .engine import Engine
 from .listen import Listener, languages_ear, telugu_ear
 from .stt import Transcriber
@@ -38,13 +38,16 @@ class Settings(BaseModel):
     agent_enabled: bool | None = None
     whatsapp_control: bool | None = None
     hey_buddy: bool | None = None
+    dictation: bool | None = None
     guest_password: str | None = None  # empty turns guests off
 
 
 def hear(engine: Engine, transcriber, audio: bytes, require_wake: bool) -> dict:
     """require_wake: from always-on listening, so it may not be meant for Buddy at all."""
     # At a lock screen, anyone in the room could say it. And while talking, this is Buddy hearing itself.
-    if require_wake and (actions.is_locked() or (engine.speaker and engine.speaker.speaking)):
+    # Also while dictating, which the page hears too: acting on it would do everything twice.
+    dictating = dictation.current is not None and dictation.current.busy()
+    if require_wake and (dictating or actions.is_locked() or (engine.speaker and engine.speaker.speaking)):
         return {"text": "", "accepted": False}
     # Settled on arrival: the window to answer shouldn't close while the answer is being transcribed.
     unaddressed = require_wake and not engine.listening()
@@ -63,6 +66,7 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     voice_notes = Listener(Transcriber(settings["voice_note_model"], beam_size=5, skip_silence=False), telugu, wider)
     threading.Thread(target=voice_notes.load, daemon=True).start()
     whatsapp.start_bridge(engine, voice_notes)
+    dictation.start(engine, transcriber)
     reminders.start(engine)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -161,7 +165,9 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
     @app.get("/api/settings", dependencies=guarded)
     def read_settings():
         current = config.load()
-        return {**{key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control", "ai_model", "voice_style", "hey_buddy")},
+        return {**{key: current[key] for key in ("whatsapp_phone", "agent_enabled", "whatsapp_control", "ai_model", "voice_style", "hey_buddy",
+                                                 "dictation")},
+                "dictation_key": dictation.key_label(current["dictation_key"]),
                 "guests_on": guests.enabled()}
 
     @app.post("/api/settings", dependencies=guarded)
@@ -175,6 +181,8 @@ def create_app(engine: Engine | None = None, transcriber: Transcriber | None = N
             current["whatsapp_control"] = body.whatsapp_control
         if body.hey_buddy is not None:
             current["hey_buddy"] = body.hey_buddy
+        if body.dictation is not None:
+            current["dictation"] = body.dictation
         if body.guest_password is not None:
             try:
                 guests.set_password(body.guest_password) if body.guest_password else guests.turn_off()

@@ -45,7 +45,8 @@ PROFILE = "whatsapp-profile"
 CHAT_URL = "https://web.whatsapp.com/send?phone={phone}"
 WINDOW_CLASS = "BuddyWhatsApp"
 # WhatsApp Web turns away browsers that identify themselves as headless.
-USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+USER_AGENT = (f"Mozilla/5.0 ({'Windows NT 10.0; Win64; x64' if config.WINDOWS else 'X11; Linux x86_64'}) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36")
 POLL_MS = 1500
 MEDIA_SECONDS = 40
 RECLICK_SECONDS = 6
@@ -154,7 +155,7 @@ def _open_context(playwright, *args: str, visible: bool = False):
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     size = {"no_viewport": True} if visible else {"viewport": {"width": 1280, "height": 900}, "user_agent": USER_AGENT}
     return playwright.chromium.launch_persistent_context(
-        profile, channel="chrome", headless=not visible, env=apps.session_env(),
+        profile, channel=apps.browser_channel(), headless=not visible, env=apps.session_env(),
         # desktop.py hides this class from window commands. The basic password store means a
         # locked keyring can't stop this with a prompt nobody is there to answer.
         args=[f"--class={WINDOW_CLASS}", "--password-store=basic", *args], **size,

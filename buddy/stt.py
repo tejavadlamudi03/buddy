@@ -6,6 +6,8 @@ from faster_whisper import WhisperModel
 from faster_whisper.audio import decode_audio
 from faster_whisper.vad import get_speech_timestamps
 
+from . import config
+
 
 def seconds_of(audio: bytes) -> float:
     return len(decode_audio(io.BytesIO(audio))) / 16000  # what decode_audio always gives
@@ -52,7 +54,8 @@ class Transcriber:
         self.load()
         with self._lock:
             segments, _ = self._model.transcribe(
-                io.BytesIO(audio), language=language or self.language, beam_size=self.beam_size, vad_filter=self.skip_silence, hotwords=expect,
+                io.BytesIO(audio), language=language or self.language, beam_size=self.beam_size, vad_filter=self.skip_silence,
+                hotwords=" ".join(filter(None, [expect, *config.load()["dictionary"]])) or None,
                 condition_on_previous_text=False,
             )
             parts = list(segments)

@@ -1,12 +1,19 @@
-"""Persistent settings, stored with owner-only permissions in ~/.config/buddy."""
+"""Persistent settings, stored with owner-only permissions in ~/.config/buddy (AppData on Windows)."""
 import json
 import os
 import secrets
+import sys
+from datetime import datetime
 from pathlib import Path
 
-CONFIG_DIR = Path(os.environ.get("BUDDY_CONFIG_DIR", Path.home() / ".config/buddy"))
+WINDOWS = sys.platform == "win32"
+# Without this, every background tool would flash a black window on the screen. CREATE_NO_WINDOW.
+NO_WINDOW = {"creationflags": 0x08000000} if WINDOWS else {}
+_CONFIG_HOME = Path.home() / "AppData/Roaming/Buddy" if WINDOWS else Path.home() / ".config/buddy"
+_DATA_HOME = Path.home() / "AppData/Local/Buddy" if WINDOWS else Path.home() / ".local/share/buddy"
+CONFIG_DIR = Path(os.environ.get("BUDDY_CONFIG_DIR", _CONFIG_HOME))
 CONFIG_FILE = CONFIG_DIR / "config.json"
-DATA_DIR = Path(os.environ.get("BUDDY_DATA_DIR", Path.home() / ".local/share/buddy"))
+DATA_DIR = Path(os.environ.get("BUDDY_DATA_DIR", _DATA_HOME))
 SCREENSHOT_DIR = Path(os.environ.get("BUDDY_SCREENSHOT_DIR", Path.home() / "Pictures/Buddy"))
 
 DEFAULTS = {
@@ -27,6 +34,9 @@ DEFAULTS = {
     "private_folders": [],  # relative to home; added to files.PRIVATE_DIRS. Restart Buddy after changing it
     "voice_style": "normal",  # normal, funny, robot or giant: see tts.STYLES
     "hey_buddy": False,  # True: the mic stays on while Buddy's window is open, listening for "Hey Buddy"
+    "dictation": True,  # hold dictation_key in any app and speak, and it's typed there: see dictation.py
+    "dictation_key": "ctrl_r",  # pynput's name for it: ctrl_r, alt_r, f8 and so on. Restart Buddy after changing it
+    "dictionary": [],  # names and words to spell exactly like this, which the speech model and tidying both use
 }
 
 # What suits each kind of laptop, chosen by scripts/install.sh. Any of these can be changed afterwards in the config.
@@ -37,6 +47,11 @@ PROFILES = {
               "whisper_model": "base.en", "voice_note_model": "small.en", "languages_whisper_model": "small"},
     "basic": {"agent_enabled": False, "whisper_model": "base.en", "voice_note_model": "small.en"},  # built-in commands only
 }
+
+
+def clock(moment: datetime) -> str:
+    """Like 9:05 PM. Windows has no strftime code for an hour without its leading zero."""
+    return f"{moment:%I:%M %p}".lstrip("0")
 
 
 def load() -> dict:

@@ -353,6 +353,8 @@ class Engine:
         return answer or "I couldn't come up with an answer to that"
 
     def _run_agent(self, task: str, history: list | None = None) -> str:
+        if config.WINDOWS and actions.is_locked():  # it can't see or touch a locked Windows, but it can still talk
+            return self._talk(task) if agent.QUESTION.match(task) else actions.LOCKED_ON_WINDOWS
         settings = config.load()
         recent = tuple((said[:AGENT_HISTORY_CHARS], answer[:AGENT_HISTORY_CHARS]) for said, answer in self.recent)
         answer, to_resume = agent.run(

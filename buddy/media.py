@@ -3,6 +3,8 @@ import re
 import subprocess
 import time
 
+from . import config
+
 BUS = "/org/freedesktop/DBus"
 PLAYER_PATH = "/org/mpris/MediaPlayer2"
 PLAYER = "org.mpris.MediaPlayer2.Player"
@@ -58,3 +60,7 @@ def wait_for_new_title(player: str, before: str, seconds: float = 5) -> str:
             return current
         time.sleep(0.2)
     return ""
+
+
+if config.WINDOWS:  # the same functions, through Windows' media controls instead of MPRIS
+    from .media_windows import active, command, is_playing, pause_all, players, title  # noqa: F401, E402

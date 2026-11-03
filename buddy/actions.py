@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import a11y, apps, awake, config, desktop, fetch, files, guests, location, media, ocr, reminders, share, whatsapp
+from . import a11y, apps, awake, config, desktop, dictation, fetch, files, guests, location, media, ocr, reminders, share, whatsapp, winsys
 
 RISKY = {"shutdown", "restart", "suspend", "logout"}
 READ_ONLY_COMMANDS = {"ls", "df", "du", "free", "uptime", "uname", "whoami", "date", "hostname", "lsblk", "nvidia-smi", "ps"}
@@ -20,6 +20,13 @@ MAX_COMMAND_OUTPUT = 3000
 # Never by voice or from the Buddy page: at a lock screen, anyone in the room could say it.
 WHATSAPP_ONLY = {"unlock_screen"}
 ANSWER_ON_WHATSAPP = {"download", "convert_file", "remind"}  # asked from a phone, so that's where the result goes
+# Windows hides the whole desktop from every program while it's locked, so these can only fail. Said plainly instead.
+NEEDS_DESKTOP = {"screenshot", "whatsapp_send_screenshot", "read_screen", "click", "click_text", "move", "drag", "scroll",
+                 "type_text", "press_keys", "share_screen", "open", "open_url", "open_file", "open_folder", "open_settings",
+                 "close_window", "close_app", "focus_window", "minimize_window", "maximize_window"}
+LOCKED_ON_WINDOWS = "The laptop is locked, and Windows doesn't let anything see or touch the screen until someone signs in"
+UNLOCK_ON_WINDOWS = ("Windows doesn't let any app unlock it, only someone signing in at the laptop. "
+                     "To keep control from your phone, tell me to stay awake and don't lock it before you leave")
 
 
 class UnknownTarget(LookupError):
@@ -38,6 +45,8 @@ def action(fn):
 def run(action_name: str, /, **args) -> str:
     if action_name not in REGISTRY:
         raise ValueError(f"unknown action: {action_name}")
+    if config.WINDOWS and action_name in NEEDS_DESKTOP and is_locked():
+        raise RuntimeError(LOCKED_ON_WINDOWS)
     return REGISTRY[action_name](**args) or ""
 
 
@@ -64,13 +73,24 @@ def is_risky(step: dict) -> bool:
 
 
 def _spawn(*cmd: str) -> None:
-    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True, env=apps.session_env())
+    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True, env=apps.session_env(), **config.NO_WINDOW)
 
 
 def _browse(url: str) -> None:
+    if config.WINDOWS:
+        _spawn(apps.chrome(), url) if apps.chrome() else _open_path(url)
+        return
     browser = shutil.which("google-chrome") or shutil.which("firefox") or "xdg-open"
     _spawn(browser, url)
+
+
+def _open_path(target: str) -> None:
+    """With whatever the system opens this kind of thing with."""
+    if config.WINDOWS:
+        os.startfile(target)
+    else:
+        _spawn("gio", "open", target)
 
 
 def _window_for(name: str):
@@ -79,7 +99,7 @@ def _window_for(name: str):
     windows = desktop.list_windows()
     if app:
         for window in windows:
-            if app.owns(window.cls):
+            if app.owns(window.cls, window.title):
                 return window
     needle = name.lower().strip()
     for window in windows:
@@ -96,10 +116,13 @@ def open(name: str, search_fallback: bool = False) -> str:
     app = apps.find_app(name)
     if app:
         for window in desktop.list_windows():
-            if app.owns(window.cls):
+            if app.owns(window.cls, window.title):
                 desktop.activate(window.id)
                 return f"Switched to {app.name}"
-        _spawn("gio", "launch", str(app.path))
+        if config.WINDOWS:
+            _spawn("explorer.exe", f"shell:AppsFolder\\{app.app_id}")
+        else:
+            _spawn("gio", "launch", str(app.path))
         return f"Opening {app.name}"
     if url:
         _browse(url)
@@ -159,7 +182,7 @@ def youtube_play(query: str) -> str:
 def _navigate_youtube_tab(url: str) -> bool:
     """Reuses the YouTube tab on show, so songs don't pile up as tabs."""
     window = next((w for w in desktop.list_windows()
-                   if "youtube" in w.title.lower() and "google-chrome" in w.cls.lower()), None)
+                   if "youtube" in w.title.lower() and apps.is_chrome(w.cls)), None)
     if window is None:
         return False
     desktop.activate(window.id)
@@ -234,13 +257,16 @@ def reply(text: str) -> str:
 
 @action
 def tell_time() -> str:
-    return f"It's {datetime.now():%-I:%M %p}"
+    return f"It's {config.clock(datetime.now())}"
 
 
 @action
 def stay_awake(seconds: int = awake.DEFAULT_SECONDS) -> str:
     until = awake.start(seconds)
-    return (f"Okay, I'll stay awake until {datetime.fromtimestamp(until):%-I:%M %p}, even with the lid closed. "
+    if config.WINDOWS:  # a program can't overrule what Windows is set to do when the lid closes
+        return (f"Okay, I'll stay awake until {config.clock(datetime.fromtimestamp(until))}. Keep me plugged in. Closing the lid "
+                "still does what Windows is set to do, so leave it open or change that in Power settings. Say allow sleep to undo this.")
+    return (f"Okay, I'll stay awake until {config.clock(datetime.fromtimestamp(until))}, even with the lid closed. "
             "Keep me plugged in and out of a bag. Say allow sleep to undo this.")
 
 
@@ -251,11 +277,14 @@ def allow_sleep() -> str:
 
 @action
 def tell_date() -> str:
-    return f"It's {datetime.now():%A, %B %-d}"
+    now = datetime.now()
+    return f"It's {now:%A, %B} {now.day}"
 
 
 @action
 def battery() -> str:
+    if config.WINDOWS:
+        return winsys.battery()
     for supply in sorted(Path("/sys/class/power_supply").glob("BAT*")):
         level = (supply / "capacity").read_text().strip()
         status = (supply / "status").read_text().strip().lower()
@@ -408,6 +437,12 @@ def focus_window(name: str) -> str:
 
 @action
 def volume(change: str, level: int | None = None) -> str:
+    if config.WINDOWS:
+        if change == "toggle":
+            winsys.toggle_mute()
+            return "Toggled mute"
+        winsys.set_volume(change, level)
+        return f"Volume {level}%" if change == "set" else f"Volume {change}"
     sink = "@DEFAULT_AUDIO_SINK@"
     if change == "toggle":
         subprocess.run(["wpctl", "set-mute", sink, "toggle"], check=True)
@@ -466,6 +501,8 @@ _SETTINGS_PANELS = {
 
 @action
 def set_option(option: str, on: bool) -> str:
+    if config.WINDOWS:
+        return winsys.set_option(option, on)
     if option not in _OPTIONS:
         raise LookupError(f"I can't change {option} yet")
     label, change = _OPTIONS[option]
@@ -485,16 +522,22 @@ def _screen_brightness(method: str, *args: str) -> str:
 
 @action
 def brightness(change: str, level: int | None = None) -> str:
-    current = int(re.search(r"\d+", _screen_brightness("Get")).group())
+    current = winsys.get_brightness() if config.WINDOWS else int(re.search(r"\d+", _screen_brightness("Get")).group())
     target = {"up": current + 15, "down": current - 15}.get(change, level or 0)
     target = max(5, min(100, target))  # 5, so a mistake can't leave a remote user with a black screen
-    _screen_brightness("Set", f"<int32 {target}>")
+    if config.WINDOWS:
+        winsys.set_brightness(target)
+    else:
+        _screen_brightness("Set", f"<int32 {target}>")
     return f"Brightness {target} percent"
 
 
 @action
 def power_profile(profile: str) -> str:
-    subprocess.run(["powerprofilesctl", "set", profile], check=True, capture_output=True, timeout=5)
+    if config.WINDOWS:
+        winsys.set_power_plan(profile)
+    else:
+        subprocess.run(["powerprofilesctl", "set", profile], check=True, capture_output=True, timeout=5)
     return f"{profile.replace('-', ' ').capitalize()} mode is on"
 
 
@@ -503,7 +546,10 @@ def open_settings(panel: str) -> str:
     wanted = panel.lower().strip()
     if wanted not in _SETTINGS_PANELS:  # could be an app of that name, like "NVIDIA X Server Settings"
         return open(f"{panel} settings")
-    _spawn("gnome-control-center", _SETTINGS_PANELS[wanted])
+    if config.WINDOWS:
+        winsys.open_settings(_SETTINGS_PANELS[wanted])
+    else:
+        _spawn("gnome-control-center", _SETTINGS_PANELS[wanted])
     return f"Opening {panel} settings"
 
 
@@ -513,13 +559,14 @@ def open_folder(name: str) -> str:
              "pictures": "PICTURES", "music": "MUSIC", "videos": "VIDEOS"}
     path = str(Path.home())
     if name in kinds:
-        path = subprocess.run(["xdg-user-dir", kinds[name]], capture_output=True, text=True, timeout=5).stdout.strip()
-    _spawn("gio", "open", path)
+        path = str(files.folder_path(name)) if config.WINDOWS else subprocess.run(
+            ["xdg-user-dir", kinds[name]], capture_output=True, text=True, timeout=5).stdout.strip()
+    _open_path(path)
     return f"Opening {name}"
 
 
 def _describe_file(path: Path) -> str:
-    return f"{path.name}  ({path.parent.as_posix().replace(str(Path.home()), '~')})"
+    return f"{path.name}  ({str(path.parent).replace(str(Path.home()), '~')})"
 
 
 @action
@@ -543,7 +590,7 @@ def open_file(name: str) -> str:
     path = files.resolve(name)
     if path is None:
         raise UnknownTarget(f"I couldn't find a file called {name}")
-    _spawn("gio", "open", str(path))
+    _open_path(str(path))
     return f"Opening {path.name}"
 
 
@@ -638,6 +685,40 @@ def set_voice(style: str) -> str:
 
 
 @action
+def set_dictation(on: bool) -> str:
+    settings = {**config.load(), "dictation": on}
+    config.save(settings)
+    return f"Dictation is on. Hold {dictation.key_label(settings['dictation_key'])} in any app and speak" if on else "Dictation is off"
+
+
+@action
+def add_to_dictionary(word: str) -> str:
+    word = word.strip(" '\".,")
+    settings = config.load()
+    if word.lower() in (known.lower() for known in settings["dictionary"]):
+        return f"{word} is already in your dictionary"
+    config.save({**settings, "dictionary": [*settings["dictionary"], word]})
+    return f"Added {word} to your dictionary. I'll spell it like that from now on"
+
+
+@action
+def remove_from_dictionary(word: str) -> str:
+    word = word.strip(" '\".,")
+    settings = config.load()
+    kept = [known for known in settings["dictionary"] if known.lower() != word.lower()]
+    if len(kept) == len(settings["dictionary"]):
+        return f"{word} isn't in your dictionary"
+    config.save({**settings, "dictionary": kept})
+    return f"Removed {word} from your dictionary"
+
+
+@action
+def list_dictionary() -> str:
+    words = config.load()["dictionary"]
+    return "Your dictionary: " + ", ".join(words) if words else "Your dictionary is empty. Say: add a word to my dictionary"
+
+
+@action
 def share_location(send: bool = True) -> str:
     phone = _owner_phone() if send else ""  # before looking anything up
     place = location.find()
@@ -663,15 +744,21 @@ def system_report() -> str:
             return ""
 
     disk = shutil.disk_usage(Path.home())
-    memory = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines())
-    gigabytes = lambda key: int(memory[key].split()[0]) / 1048576
-    # By type, since the "active" column is translated on a non-English system.
-    wifi = next((line.split(":", 1)[1] for line in output("nmcli", "-t", "-f", "TYPE,NAME", "connection", "show", "--active").splitlines()
-                 if line.startswith("802-11-wireless:")), "not connected")
+    if config.WINDOWS:
+        processor, wifi = winsys.processor_line(), winsys.connected_wifi()
+        used, total = winsys.memory_gb()
+    else:
+        memory = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines())
+        gigabytes = lambda key: int(memory[key].split()[0]) / 1048576
+        # By type, since the "active" column is translated on a non-English system.
+        wifi = next((line.split(":", 1)[1] for line in output("nmcli", "-t", "-f", "TYPE,NAME", "connection", "show", "--active").splitlines()
+                     if line.startswith("802-11-wireless:")), "not connected")
+        processor = f"CPU load {os.getloadavg()[0]:.1f} on {os.cpu_count()} threads"
+        used, total = gigabytes("MemTotal") - gigabytes("MemAvailable"), gigabytes("MemTotal")
     lines = [
         battery(),
-        f"CPU load {os.getloadavg()[0]:.1f} on {os.cpu_count()} threads",
-        f"Memory {gigabytes('MemTotal') - gigabytes('MemAvailable'):.0f} of {gigabytes('MemTotal'):.0f} GB used",
+        processor,
+        f"Memory {used:.0f} of {total:.0f} GB used",
         f"Disk {disk.free / 1e9:.0f} GB free of {disk.total / 1e9:.0f} GB",
         f"Wi-Fi {wifi}",
     ]
@@ -680,7 +767,7 @@ def system_report() -> str:
         lines.append(f"GPU {gpu}")
     lines.append(lock_status())
     if until := awake.until():
-        lines.append(f"Staying awake until {datetime.fromtimestamp(until):%-I:%M %p}")
+        lines.append(f"Staying awake until {config.clock(datetime.fromtimestamp(until))}")
     if guests.enabled():
         lines.append(f"WhatsApp guests: {guests.with_access()} with access, {guests.current.waiting() if guests.current else 0} waiting")
     windows = [window.title for window in desktop.list_windows() if desktop.BUDDY_TITLE not in window.title]
@@ -693,7 +780,8 @@ def system_report() -> str:
 def run_readonly(command: str) -> str:
     """For the local AI: only commands that just look at things, with no shell features at all."""
     parts = shlex.split(command)
-    if not parts or parts[0] not in READ_ONLY_COMMANDS or re.search(r"[;&|<>`$]", command):
+    allowed = winsys.READ_ONLY_COMMANDS if config.WINDOWS else READ_ONLY_COMMANDS
+    if not parts or parts[0] not in allowed or re.search(r"[;&|<>`$]", command):
         return "refused: only simple look-only commands are allowed. The user must ask to run anything else"
     return _run(parts, shell=False)
 
@@ -704,10 +792,12 @@ def run_command(command: str) -> str:
 
 
 def _run(command, shell: bool) -> str:
+    if config.WINDOWS and shell:
+        command, shell = ["powershell", "-NoProfile", "-NonInteractive", "-Command", command], False
     try:
         done = subprocess.run(command, shell=shell, executable="/bin/bash" if shell else None, capture_output=True,
-                              text=True, timeout=COMMAND_SECONDS, cwd=Path.home(), env=apps.session_env(),
-                              stdin=subprocess.DEVNULL)
+                              text=True, errors="replace", timeout=COMMAND_SECONDS, cwd=Path.home(), env=apps.session_env(),
+                              stdin=subprocess.DEVNULL, **config.NO_WINDOW)
     except subprocess.TimeoutExpired:
         return f"That command was still running after {COMMAND_SECONDS} seconds, so I stopped it"
     combined = (done.stdout + done.stderr).strip() or "(no output)"
@@ -718,6 +808,9 @@ def _run(command, shell: bool) -> str:
 
 @action
 def empty_trash() -> str:
+    if config.WINDOWS:
+        winsys.empty_recycle_bin()
+        return "The Recycle Bin is empty"
     subprocess.run(["gio", "trash", "--empty"], check=True, timeout=120)
     return "The trash is empty"
 
@@ -737,6 +830,8 @@ def _screen_saver(method: str) -> str:
 
 
 def is_locked() -> bool:
+    if config.WINDOWS:
+        return winsys.is_locked()
     return "true" in _screen_saver("GetActive")
 
 
@@ -749,6 +844,8 @@ def lock_status() -> str:
 def unlock_screen() -> str:
     if not is_locked():
         return "The laptop is already unlocked"
+    if config.WINDOWS:
+        return UNLOCK_ON_WINDOWS
     subprocess.run(["loginctl", "unlock-session", _graphical_session()], check=True, timeout=5)
     deadline = time.monotonic() + 4
     while time.monotonic() < deadline:
@@ -764,6 +861,9 @@ def unlock_screen() -> str:
 
 @action
 def power(mode: str) -> str:
+    if config.WINDOWS:
+        winsys.power(mode)
+        return {"lock": "Locked"}.get(mode, f"{mode.capitalize()} started")
     commands = {
         "lock": ["loginctl", "lock-session", _graphical_session()],
         "suspend": ["systemctl", "suspend"],

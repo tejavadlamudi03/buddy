@@ -1,7 +1,7 @@
 [project]
 name = "buddy"
 version = "0.1.0"
-description = "Control your whole Linux laptop by voice"
+description = "Control your whole laptop by voice, on Ubuntu or Windows"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
@@ -9,8 +9,16 @@ dependencies = [
     "python-multipart>=0.0.9",
     "faster-whisper>=1.1",
     "pynput>=1.7",
-    "python-xlib>=0.33",
-    "ewmh>=0.1.6",
+    "python-xlib>=0.33; sys_platform == 'linux'",
+    "ewmh>=0.1.6; sys_platform == 'linux'",
+    "psutil>=5.9; sys_platform == 'win32'",
+    "sounddevice>=0.5; sys_platform == 'win32'",
+    "pycaw>=20251023; sys_platform == 'win32'",
+    "winrt-runtime>=3; sys_platform == 'win32'",
+    "winrt-Windows.Foundation>=3; sys_platform == 'win32'",
+    "winrt-Windows.Foundation.Collections>=3; sys_platform == 'win32'",
+    "winrt-Windows.Media.Control>=3; sys_platform == 'win32'",
+    "winrt-Windows.Devices.Radios>=3; sys_platform == 'win32'",
     "mss>=9.0",
     "pillow>=10.4",
     "playwright>=1.47",

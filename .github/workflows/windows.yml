@@ -1,0 +1,40 @@
+name: Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      BUDDY_LIVE_WINDOWS_TEST: "1"  # a throwaway machine, so Notepad may be typed into
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Check the PowerShell scripts parse
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($file in (Get-ChildItem scripts/*.ps1, buddy/*.ps1)) {
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors)
+            foreach ($problem in $errors) { Write-Host "$($file.Name): $problem"; $bad++ }
+          }
+          exit $bad
+      - name: Install
+        run: uv sync
+      - name: Real Windows checks
+        run: uv run python -m pytest tests/test_windows_live.py -v
+      - name: Everything else
+        if: always()
+        run: uv run python -m pytest -q --ignore=tests/test_windows_live.py
+      - name: Buddy check
+        if: always()
+        run: uv run buddy check

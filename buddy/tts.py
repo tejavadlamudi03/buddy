@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
 import wave
 from pathlib import Path
@@ -41,7 +42,7 @@ def restyle(path: str, style: str) -> None:
     styled = f"{path}.styled.wav"
     try:
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", path, "-af", STYLES[style].format(rate=rate), styled],
-                       check=True, capture_output=True, timeout=STYLE_SECONDS)
+                       check=True, capture_output=True, timeout=STYLE_SECONDS, **config.NO_WINDOW)
         os.replace(styled, path)
     except (OSError, subprocess.SubprocessError) as error:
         print(f"Couldn't apply the {style} voice: {error}", file=sys.stderr)
@@ -56,6 +57,26 @@ def _voice_path(url: str, voice: str):
             urllib.request.urlretrieve(url + name, directory / f"{name}.download")
             (directory / f"{name}.download").rename(directory / name)
     return directory / voice
+
+
+class _WindowsPlayer:
+    """Plays a sound through Windows itself, with the same wait and terminate as the Linux player's process."""
+
+    def __init__(self, path: str):
+        import winsound
+        self._winsound = winsound
+        with wave.open(path, "rb") as wav:
+            self._ends_at = time.monotonic() + wav.getnframes() / wav.getframerate()
+        self._stopped = threading.Event()
+        winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+
+    def wait(self) -> None:
+        self._stopped.wait(max(0, self._ends_at - time.monotonic()) + 0.1)
+        self.terminate()  # lets go of the file, so it can be deleted
+
+    def terminate(self) -> None:
+        self._stopped.set()
+        self._winsound.PlaySound(None, self._winsound.SND_NODEFAULT)
 
 
 class Speaker:
@@ -89,11 +110,12 @@ class Speaker:
 
     def _speak(self, text: str) -> None:
         voice = self._voice_for(text)
-        with tempfile.NamedTemporaryFile(suffix=".wav") as audio:
-            with wave.open(audio.name, "wb") as wav:
+        with tempfile.TemporaryDirectory(prefix="buddy-voice-", ignore_cleanup_errors=True) as folder:  # Windows can't reopen an open temporary file
+            audio = str(Path(folder) / "speech.wav")
+            with wave.open(audio, "wb") as wav:
                 voice.synthesize_wav(text, wav)
-            restyle(audio.name, config.load()["voice_style"])
-            self._player = subprocess.Popen(["pw-play", audio.name], stderr=subprocess.DEVNULL)
+            restyle(audio, config.load()["voice_style"])
+            self._player = _WindowsPlayer(audio) if config.WINDOWS else subprocess.Popen(["pw-play", audio], stderr=subprocess.DEVNULL)
             self._player.wait()
 
     def _loop(self) -> None:

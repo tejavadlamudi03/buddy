@@ -254,6 +254,7 @@
       </div>
       <div class="row center">
         <label class="toggle"><input type="checkbox" id="handsFree"> Listen for “Hey Buddy”</label>
+        <label class="toggle" title="Hold the key in any app and speak. Let go and it's typed there, tidied by the local AI. Start with “Buddy” for a command"><input type="checkbox" id="dictation"> Dictate in any app: hold <span id="dictationKey">Right Ctrl</span></label>
       </div>
     </section>
 
@@ -393,10 +394,10 @@ async function poll() {
   pollTimer = setTimeout(poll, 400);
 }
 // A brighter screen is too bright for him, so on go the sunglasses.
-let shadesUntil = 0, lastBrightness = 50;
+let shadesUntil = 0, lastBrightness = 50, lastHeard = '';
 function shadesFor(text) {
   const level = text.match(/^brightness (\d+) percent/i);
-  const brighter = level ? +level[1] > lastBrightness : /^dark mode\b.*\boff\b/i.test(text);
+  const brighter = level ? +level[1] > lastBrightness || /\b(brighter|up|increase|raise)\b/i.test(lastHeard) : /^dark mode\b.*\boff\b/i.test(text);
   if (level) lastBrightness = +level[1];
   if (brighter) {
     shadesUntil = performance.now() + 15000;
@@ -406,13 +407,14 @@ function shadesFor(text) {
 function react(event) {
   touch();
   if (event.kind === 'mood') { startGag(event.text); return; }
-  if (event.kind === 'heard') showBubble(`“${event.text}”`, true);
+  if (event.kind === 'heard') { lastHeard = event.text; showBubble(`“${event.text}”`, true); }
   if (event.kind === 'say' || event.kind === 'report') {
     showBubble(event.text);
     shadesFor(event.text);
     lastSaid = event.text;
     say(event.text);
-    if (!game && !gag && !/^(stopped|sorry|i couldn|i can.t|i didn|still working)/i.test(event.text)) feel('happy', 1500);
+    if (/^playing\b/i.test(event.text)) startGag('dance');  // his song came on
+    else if (!game && !gag && !/^(stopped|sorry|i couldn|i can.t|i didn|still working)/i.test(event.text)) feel('happy', 1500);
   }
   if (event.kind === 'error') { showBubble(event.text); feel('oops', 2600); }
   if (['say', 'report', 'error'].includes(event.kind) && $('talk').hidden) $('chatDot').hidden = false;
@@ -502,7 +504,7 @@ function startGag(name) {
   script.blown = false;
   script.start?.();
 }
-const IDLE_GAGS = ['watch', 'scratch', 'peek', 'yawn', 'face', 'sneeze', 'slip', 'flex', 'scratch', 'watch', 'flex'];
+const IDLE_GAGS = ['watch', 'scratch', 'peek', 'yawn', 'face', 'sneeze', 'slip', 'flex', 'dance', 'scratch', 'watch', 'flex', 'dance'];
 function runGag(t, state, now) {
   if (state === 'idle' && !gag && !calm && !game && now > nextIdleGag) {
     startGag(IDLE_GAGS[Math.floor(Math.random() * IDLE_GAGS.length)]);
@@ -875,6 +877,7 @@ $('handsFree').addEventListener('change', async event => {
   saveSettings({hey_buddy: event.target.checked}).catch(() => {});
 });
 $('stop').addEventListener('click', () => api('/api/stop', {method: 'POST'}));
+$('dictation').addEventListener('change', event => saveSettings({dictation: event.target.checked}).catch(() => {}));
 
 // Settings panel
 function togglePanel(open) {
@@ -1165,6 +1168,8 @@ $('guestOff').addEventListener('click', async () => showGuests((await saveSettin
 api('/api/settings').then(settings => {
   showGuests(settings.guests_on);
   $('voiceStyle').value = settings.voice_style;
+  $('dictation').checked = settings.dictation;
+  $('dictationKey').textContent = settings.dictation_key;
   if (settings.hey_buddy) { // stays on across restarts, so Buddy is listening as soon as its window opens
     $('handsFree').checked = true;
     ensureMic().then(() => audioContext.resume()).catch(error => {

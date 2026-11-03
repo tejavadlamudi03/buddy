@@ -1,6 +1,6 @@
 # Buddy
 
-**A voice assistant that controls your whole Linux laptop, using AI that runs on the laptop itself.**
+**A voice assistant that controls your whole laptop, on Ubuntu or Windows, using AI that runs on the laptop itself.**
 
 Talk to it at your desk, or message it on WhatsApp from anywhere. It opens apps, plays music, clicks
 buttons, reads documents, answers questions, plays games, and streams your live screen to your phone. It
@@ -21,10 +21,11 @@ understands English, German, Hindi and Telugu. No AI service is involved, and th
 **Reach it from anywhere**
 - **WhatsApp:** send commands, chat with the AI, send photos and documents to be read, and get files and screenshots back.
 - **Live screen on your phone:** view-only or with control, in a browser with no app to install.
-- **Unlock from WhatsApp**, keep the laptop awake while you're away, and ask where it is.
+- **Unlock from WhatsApp** (Ubuntu only), keep the laptop awake while you're away, and ask where it is.
 - **Other people** can chat with the AI on your WhatsApp number if you set a password. They can't control the laptop.
 
 **Talk to it your way**
+- **Dictate in any app:** hold Right Ctrl and speak, and your words are typed where the cursor is, with the "um"s and corrections tidied by the local AI. Like Wispr Flow, but nothing leaves the laptop.
 - Hold-to-talk, hands-free "Hey Buddy", typing, voice notes or text messages.
 - **English, German, Hindi and Telugu**, spoken or typed, including Hindi and Telugu in English letters ("chrome open cheyyi", "gaana band karo").
 - Four voices: normal, funny, robot and giant.
@@ -39,12 +40,36 @@ understands English, German, Hindi and Telugu. No AI service is involved, and th
 **Keep it yours**
 - All the AI runs on your laptop, with no AI service or subscription, and you can [choose or download another model](#choosing-the-ai-model) to suit your hardware.
 - Risky actions ask first, private files stay out of reach, and only your number can give commands. See [Privacy and safety](#privacy-and-safety).
+- Runs on **Ubuntu**, and now on **Windows 10 and 11** too, which is new and not yet tried on a real Windows laptop. See [Buddy on Windows](#buddy-on-windows).
+
+## How Buddy compares
+
+Buddy isn't an AI model. It's an assistant built on open models that run on your laptop: Gemma 4 thinks, Whisper hears and
+Piper speaks. So the fair comparison is with other assistants.
+
+| | Buddy | [OpenClaw](https://www.digitalocean.com/resources/articles/what-is-moltbot) | Cloud assistants (ChatGPT agent, Claude, Copilot, Siri) | [Wispr Flow](https://wisprflow.ai/data-controls) |
+| --- | --- | --- | --- | --- |
+| Where the AI runs | Always on your laptop | Usually cloud models. Local ones are possible through Ollama, but [hard in practice](https://www.mindstudio.ai/blog/what-is-openclaw-ai-agent) | Their servers | Its cloud, for every word |
+| Cost | Free, with no API keys | Free software, but you pay for the model's API | Subscriptions or usage fees | Subscription |
+| How you use it | Voice first, dictation in any app, WhatsApp, typing | Chat apps such as WhatsApp, Telegram and Slack | Their apps, or the operating system | Dictation only |
+| What it controls | The whole desktop: it sees the screen, clicks buttons by name and types in any app | Files, scripts, the browser and online accounts | Varies, often a browser or what the system allows | Nothing, it only types |
+| Your screen on your phone | Live, view-only or with control | No | No | No |
+| Everyday commands | Instant, with no AI, from a fixed list of commands | Through the model | Through the model | No |
+
+**Where Buddy is behind:** a small local model is much weaker than the cloud models the others use, so long tasks on screen
+are less reliable. It remembers only the last few exchanges, can't search the web when chatting, has no add-on skills or
+community, and has had no security review. Larger projects are tested by many people: OpenClaw, for example, had a
+[serious security flaw](https://www.proarch.com/blog/threats-vulnerabilities/openclaw-rce-vulnerability-cve-2026-25253) found
+and fixed because so many people use it. Buddy hasn't had that scrutiny.
+
+**In one line:** a private, voice-first assistant that controls your whole laptop and shows it on your phone, with nothing
+leaving the machine and nothing to pay.
 
 ## Will it run on my laptop?
 
-It needs **Ubuntu with GNOME on an Xorg session**, on a 64-bit Intel or AMD processor, with at least 8 GB of
-memory and 5 GB of free disk. Buddy is built and tested on Ubuntu 24.04. Windows, macOS and Wayland sessions
-won't work, because Wayland deliberately stops apps from controlling each other.
+It needs **Ubuntu with GNOME on an Xorg session** or **Windows 10 or 11** (see [Buddy on Windows](#buddy-on-windows)), on a
+64-bit Intel or AMD processor, with at least 8 GB of memory and 5 GB of free disk. Buddy is built and tested on Ubuntu 24.04.
+macOS and Wayland sessions won't work, because Wayland deliberately stops apps from controlling each other.
 
 The installer looks at your hardware and picks the setup that suits it:
 
@@ -73,6 +98,8 @@ LibreOffice, Chrome and the accessibility libraries. Everything else stays in th
 - See what's working at any time: `.venv/bin/buddy check`.
 - Switch setups later: `scripts/install.sh --profile=light`.
 
+On Windows, see [Buddy on Windows](#buddy-on-windows).
+
 ### If there's no Xorg
 
 - **On Ubuntu 24.04:** log out, click your name, and choose "Ubuntu on Xorg" under the gear icon at the bottom right.
@@ -80,6 +107,41 @@ LibreOffice, Chrome and the accessibility libraries. Everything else stays in th
   `sudo apt install xorg` and restart.
 - **On a newer Ubuntu with no Xorg session:** install Ubuntu 24.04. Without Xorg, screenshots, clicking, typing,
   window control and the live screen can't work.
+
+## Buddy on Windows
+
+> **New, and not yet tried on a real Windows laptop.** It has only been checked against simulated Windows libraries. A workflow
+> in `.github/workflows/windows.yml` tests it on a real Windows machine whenever it's pushed. Expect rough edges.
+
+Install it from a normal PowerShell window, not as administrator. You need [Git](https://git-scm.com/download/win):
+
+    git clone https://github.com/tejavadlamudi03/buddy.git $HOME\buddy
+    cd $HOME\buddy
+    powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Check   # shows what it would choose, and changes nothing
+    powershell -ExecutionPolicy Bypass -File scripts\install.ps1          # installs it
+
+It picks a setup the same way as on Ubuntu, and asks before using `winget` to install FFmpeg, Poppler and LibreOffice. It uses
+Chrome if you have it, and otherwise Edge, for Buddy's page and for WhatsApp. Everything else stays in this folder and
+`AppData\Local\Buddy`, and your settings are in `AppData\Roaming\Buddy`. It adds Buddy to the Start menu and starts it when
+you log in, with no console window. Its output goes to `AppData\Local\Buddy\buddy.log`. To stop it starting by itself, turn it
+off under Task Manager > Startup apps. To see what's working: `.venv\Scripts\buddy check`.
+
+Commands are the same, with these differences:
+
+| Feature | On Windows |
+| --- | --- |
+| **Unlock from WhatsApp** | **Not possible.** Windows only lets a person signing in unlock it, so Buddy tells you this instead |
+| **While locked** | Windows hides the desktop from every app, so Buddy can't see, click, type or share the screen. The phone shows a "locked" notice. AI chat, reminders, files on WhatsApp and "Lock" still work. If you need control from far away, **don't lock it before you leave** |
+| **Stay awake** | Stops it sleeping, but can't overrule the lid. Leave the lid open, or set "When I close the lid" to do nothing under Power settings. While your screen is shared, it also keeps the screen on so it doesn't time out and lock |
+| **Airplane mode, night light, do not disturb** | Windows has no way for apps to switch these, so Buddy opens the right Settings page for you |
+| **Wi-Fi and Bluetooth** | Work, through Windows' own radio controls |
+| **Brightness** | Works on a laptop's own screen, not usually on an external monitor |
+| **Power modes** | Only those Windows offers: many newer laptops have Balanced only, and the others will fail |
+| **Record the screen** | Presses Win+Alt+R, for Xbox Game Bar, which records one app rather than the desktop, and has to be switched on |
+| **Running commands** | "Run ..." uses PowerShell. The local AI can only run `whoami`, `hostname`, `tasklist`, `systeminfo`, `driverquery`, `where` and `nvidia-smi` |
+| **Location** | Windows 11 may need Location turned on to list Wi-Fi networks. Without that it's a rough guess from your internet connection |
+| **Dictation** | Records through `sounddevice` instead of PipeWire. Untested on Windows |
+| **Word, Excel, PowerPoint** | Open Microsoft Office if you have it. Say "LibreOffice Writer" for that |
 
 ## Using Buddy
 
@@ -89,6 +151,8 @@ crash, though it can't run until someone has logged in after a reboot.
 | To do this | Do this |
 | --- | --- |
 | Talk | Hold Buddy with the mouse, or hold the **space bar**, while you speak |
+| Dictate in any app | Hold **Right Ctrl**, speak, and let go. See [Dictation](#dictation-in-any-app) |
+| Command Buddy from any app | Hold **Right Ctrl** and say "Buddy, open YouTube". Buddy's window doesn't need to be open |
 | Talk hands-free | Tick **Listen for "Hey Buddy"**, then say "Hey Buddy" and wait for "Yes?", or say it all at once: "Hey Buddy, what time is it" |
 | Type | Open the chat with the speech-bubble button at the top right |
 | Cancel what's running | Press **Esc** or **Stop**, or say "Stop" |
@@ -100,6 +164,40 @@ Right after a command, the next known command works without saying "Buddy".
 "Hey Buddy" works while Buddy's window is open, even minimised, but not once it's closed. It keeps the microphone on and
 transcribes speech on your laptop, and nothing leaves it. It ignores you while the screen is locked, so nobody can give
 commands at a lock screen.
+
+## Dictation in any app
+
+Like [Wispr Flow](https://wisprflow.ai), but local. Wispr Flow itself sends your voice to its cloud, has no Linux app
+and no API, so Buddy does the same job on the laptop instead.
+
+1. Put the cursor where the text should go, in any app: a chat, an email, a document, a code editor.
+2. Hold **Right Ctrl** and speak. Let go when you're done.
+3. About two seconds later for English, the text is typed there.
+
+The local AI tidies what you said into what you meant, and nothing else:
+
+| You say | It types |
+| --- | --- |
+| "Um, so the train leaves at six, no wait, at seven tonight" | So the train leaves at 7 tonight. |
+| "Hey, uh, I just wanted to let you know that I will be, um, late today, sorry" | Hey, I just wanted to let you know that I will be late today, sorry. |
+| "What is the capital of France" | What is the capital of France? It writes your question down, and never answers it |
+| "Ich komme morgen um drei Uhr, äh, nein, um vier Uhr" | Ich komme morgen um 4 Uhr. |
+
+- **Starting with "Buddy" makes it a command** instead, in any of its languages: "Buddy, open YouTube" works from any app.
+- **English, German, Hindi and Telugu.** English takes about 2 seconds after you let go. The others take 6 to 11 seconds, as
+  the language is detected first and then its own model listens. Telugu is only cleared of "um"s and given a full stop,
+  because the local AI changed the meaning of both Telugu sentences it was tested on.
+- **A quick tap of Right Ctrl, or a shortcut like Right Ctrl+C, does nothing.** Only holding it on its own for at least
+  0.4 seconds dictates.
+- **Teach it names and words** it gets wrong: "Add Bhanuteja to my dictionary". Both the speech model and the tidying
+  then spell them that way, for commands too. "What's in my dictionary", "Remove Bhanuteja from my dictionary".
+- **Turn it off** with the tick box on Buddy's page, or say "Turn off dictation". Another key: set `dictation_key` in the settings.
+- Without the local AI, it still types what you said, with the "um"s taken out.
+- The key is watched in every app, but only that key. Other keys are only noticed as "another key was pressed", to tell a
+  shortcut from dictation, and are never kept. The recording is deleted as soon as it's been heard.
+
+Tested with real key presses on a separate virtual screen, and with generated voices in all four languages. Your own
+voice and microphone haven't been tested yet.
 
 ## All the commands
 
@@ -259,6 +357,8 @@ On WhatsApp, just "screenshot" or "screen" works too.
 | "Use the funny voice", "Talk like a robot", "Use the giant voice", "Go back to the normal voice" | Changes how Buddy sounds. It's also under Settings |
 | "Share my location", "Where is my laptop" | Sends the laptop's location to your WhatsApp as a Maps link, and says how accurate it is |
 | "Run df -h" | Reads the command back, **asks first**, then returns the output |
+| "Add Bhanuteja to my dictionary", "Remove ROS from my dictionary", "What's in my dictionary" | Words for dictation and the speech model to spell exactly like that |
+| "Turn off dictation", "Turn on dictation" | Whether holding Right Ctrl dictates. It's also a tick box on Buddy's page |
 
 ### Questions and writing
 
@@ -446,6 +546,10 @@ Say "Share my screen", or use Settings, then open the link or scan the code. Not
 ```mermaid
 flowchart TD
     mic["Microphone"] --> whisper["Local Whisper<br/>speech to text"]
+    key["Hold Right Ctrl<br/>in any app"] --> dictation{"Dictation<br/>dictation.py"}
+    dictation -- "starts with Buddy" --> rules
+    dictation -- "anything else" --> tidy["Local AI tidies it<br/>fillers and corrections"]
+    tidy --> typed["Typed where<br/>the cursor is"]
     note["WhatsApp voice note"] --> whisper
     text["WhatsApp or typed text"] --> rules
     file["WhatsApp photo or document"] --> talk
@@ -462,8 +566,9 @@ flowchart TD
     talk --> reply
 ```
 
-Whisper hears, Piper speaks, Linux accessibility and RapidOCR read apps, and an open source model in Ollama thinks. Clicks only
-ever target the front window. Known commands need no AI at all, so they're instant.
+Whisper hears, Piper speaks, the system's accessibility tree and RapidOCR read apps, and an open source model in Ollama thinks.
+Clicks only ever target the front window. Known commands need no AI at all, so they're instant. Dictation picks the
+language before listening properly, which is why English is quick: when the English model is sure, nothing else runs.
 
 | File | What it does |
 | --- | --- |
@@ -471,6 +576,9 @@ ever target the front window. Known commands need no AI at all, so they're insta
 | `parser.py`, `actions.py` | Everyday words into steps, and the fixed list of what can be done |
 | `agent.py`, `ai.py`, `language.py` | The local AI: working through the screen, chat, translation |
 | `listen.py`, `stt.py`, `tts.py` | Hearing and speaking |
+| `dictation.py` | Holding a key to dictate in any app |
+| `desktop.py`, `desktop_x11.py`, `desktop_windows.py`, `media.py` | Keyboard, mouse, windows, screenshots and media, on Ubuntu or Windows |
+| `winsys.py`, `media_windows.py`, `a11y_helper.ps1` | What Windows does differently: settings, power, audio, the Start menu, media controls |
 | `games.py` | The games and their rules |
 | `models.py` | Which AI models fit this laptop, and downloading them |
 | `whatsapp.py`, `attachments.py` | The WhatsApp bridge, and reading files sent to it |
@@ -480,10 +588,11 @@ ever target the front window. Known commands need no AI at all, so they're insta
 ## Privacy and safety
 
 - **On your laptop:** voice, screen contents and AI processing. The exceptions are websites you ask for, WhatsApp, downloads, and screen sharing when you turn it on.
-- **Commands only from you:** the server listens on `127.0.0.1` and each call needs the token in `~/.config/buddy/config.json`. Treat Buddy's link like a password.
+- **Commands only from you:** the server listens on `127.0.0.1` and each call needs the token in `~/.config/buddy/config.json` (`AppData\Roaming\Buddy\config.json` on Windows). Treat Buddy's link like a password.
+- **Dictation watches one key.** To tell dictation from a shortcut, Buddy notices that some other key was pressed while Right Ctrl was held, but never which one, and keeps nothing. A recording is deleted as soon as it's been heard.
 - **Pasted text and files are only discussed.** Anything with several lines, over 300 characters, or sent as a file goes to a conversation with no actions, so text inside it can't run as a command.
 - **The AI has limits.** It picks only from a fixed list of actions (`AGENT_ACTIONS`), and it can't power off the laptop, start screen sharing, download files or run commands of its own. It's told to ask before sending, buying or deleting, but that part is an instruction to the model and not a hard limit, so watch it on sensitive pages. It can type into a terminal only if your request mentions a terminal, command, install or similar, and the VS Code terminal isn't covered by that check.
-- **Private files stay private.** Buddy won't find, read, send or convert anything in `.ssh`, `.gnupg`, `.aws`, browser and mail profiles or its own data, or files like `.env` and `*.pem`. Add your own folders under `private_folders` in the config, and restart Buddy. A "run" command you confirm yourself isn't limited by this.
+- **Private files stay private.** Buddy won't find, read, send or convert anything in `.ssh`, `.gnupg`, `.aws`, browser and mail profiles or its own data, the whole of `AppData` on Windows, or files like `.env` and `*.pem`. Add your own folders under `private_folders` in the config, and restart Buddy. A "run" command you confirm yourself isn't limited by this.
 - **Screen sharing goes through a temporary Cloudflare tunnel.** The link is encrypted, but Cloudflare's servers handle the traffic, and anyone with the link can see your screen until it ends. The tunnel reaches only a small separate server, never Buddy's main token or settings.
 - **Converting opens the file** in `ffmpeg` or LibreOffice, so only use links you trust. A downloaded file is never run.
 - **Your location is looked up only when you ask.** Buddy sends the addresses of nearby Wi-Fi networks and your internet address to [beaconDB](https://beacondb.net/), and the link goes to your own WhatsApp chat. The local AI can't request it. This doesn't use Ubuntu's Location Services, so turning those off doesn't stop it.
@@ -498,12 +607,13 @@ They're in `~/.config/buddy/config.json`. Restart Buddy after changing them with
 | `agent_enabled` | `false` turns the local AI off |
 | `whisper_model`, `voice_note_model`, `languages_whisper_model` | Speech models for the mic, for voice notes, and for Hindi and German. Smaller ones are faster |
 | `voice_style`, `hey_buddy` | How Buddy sounds, and whether it listens for "Hey Buddy" |
+| `dictation`, `dictation_key`, `dictionary` | Whether holding a key dictates, which key (`ctrl_r`, `alt_r`, `f8` and so on), and words to spell exactly |
 | `private_folders` | Extra folders Buddy must never touch |
 | `agent_max_steps`, `share_minutes`, `port` | The AI's step limit, how long a share lasts, the local port |
 
 ## What it can't do yet
 
-- Run on anything but Ubuntu with Xorg, or speed up on graphics cards other than NVIDIA.
+- Run on anything but Ubuntu with Xorg or Windows, or speed up on graphics cards other than NVIDIA.
 - Remember you over time. It keeps the last 6 exchanges until it restarts, and the model never learns from you.
 - Look things up online when chatting, so recent facts may be out of date.
 - Send files over 50 MB, download from YouTube and similar sites, or work while the laptop is asleep.
@@ -514,4 +624,6 @@ They're in `~/.config/buddy/config.json`. Restart Buddy after changing them with
 
     env -u PYTHONPATH uv run --group dev pytest   # a sourced ROS environment breaks pytest otherwise
 
-The tests fake WhatsApp and the desktop, so changes to those also need trying for real.
+The tests fake WhatsApp and the desktop, so changes to those also need trying for real. `tests/test_windows.py` runs anywhere,
+with Windows' libraries faked. `tests/test_windows_live.py` needs a real Windows machine and types into Notepad, so it only runs
+with `BUDDY_LIVE_WINDOWS_TEST` set, as the GitHub workflow does on its throwaway machines.

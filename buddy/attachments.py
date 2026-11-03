@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from . import apps, fetch
+from . import apps, config, fetch
 
 MAX_TEXT_CHARS = 12000  # about what fits in the model's context
 MAX_PAGES_AS_PICTURES = 3
@@ -43,8 +43,8 @@ def _picture(path: Path) -> Attachment:
 
 
 def _output(*command: str) -> str:
-    return subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=120,
-                          env=apps.session_env(), stdin=subprocess.DEVNULL).stdout
+    return subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace", timeout=120,
+                          env=apps.session_env(), stdin=subprocess.DEVNULL, **config.NO_WINDOW).stdout
 
 
 def _pdf(path: Path) -> Attachment:
@@ -53,7 +53,7 @@ def _pdf(path: Path) -> Attachment:
         return _with_text(path.name, text)
     with tempfile.TemporaryDirectory(prefix="buddy-read-") as folder:
         subprocess.run(["pdftoppm", "-jpeg", "-r", "110", "-f", "1", "-l", str(MAX_PAGES_AS_PICTURES), str(path), f"{folder}/page"],
-                       capture_output=True, timeout=120, env=apps.session_env(), stdin=subprocess.DEVNULL)
+                       capture_output=True, timeout=120, env=apps.session_env(), stdin=subprocess.DEVNULL, **config.NO_WINDOW)
         pictures = []
         for page in sorted(Path(folder).glob("page*")):
             with Image.open(page) as image:
@@ -76,7 +76,7 @@ def _through_office(path: Path, wanted: str) -> str:
         output = fetch._office(path, wanted, Path(folder))
         if not output.is_file():
             raise ValueError(f"I couldn't read {path.name}")
-        return _output("pdftotext", "-layout", str(output), "-") if wanted == "pdf" else output.read_text(errors="replace")
+        return _output("pdftotext", "-layout", str(output), "-") if wanted == "pdf" else output.read_text(encoding="utf-8", errors="replace")
 
 
 def read(path: Path) -> Attachment:
@@ -92,5 +92,5 @@ def read(path: Path) -> Attachment:
     if kind in OFFICE:
         return _with_text(path.name, _through_office(path, "txt"))
     if kind in TEXT_TYPES:
-        return _with_text(path.name, path.read_text(errors="replace"))
+        return _with_text(path.name, path.read_text(encoding="utf-8", errors="replace"))
     raise ValueError(f"I can't read .{kind or 'that kind of'} files yet, but pictures, PDFs, documents, sheets, slides and text all work")
