@@ -22,7 +22,7 @@ def _ask(pid: int, *args: str) -> dict:
         helper = WINDOWS_HELPER if config.WINDOWS else [SYSTEM_PYTHON, str(HELPER)]
         done = subprocess.run([*helper, str(pid), *args], capture_output=True, encoding="utf-8", errors="replace",
                               timeout=30 if config.WINDOWS else 8, env=session_env(), **config.NO_WINDOW)
-        return json.loads(done.stdout)
+        return json.loads(done.stdout.lstrip("\ufeff"))  # Windows PowerShell can start its output with a byte order mark
     except (OSError, subprocess.SubprocessError, ValueError):
         return {}
 

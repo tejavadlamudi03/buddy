@@ -105,7 +105,7 @@ def test_buttons_can_be_pressed_by_name(notepad):
     done = subprocess.run([*a11y.WINDOWS_HELPER, str(pid), "list"], capture_output=True, encoding="utf-8", errors="replace", timeout=60)
     took = time.monotonic() - started
     assert '"items"' in done.stdout, (f"{took:.1f}s", done.stdout[-500:], done.stderr[-1500:])
-    assert a11y.names(pid), f"the helper answered in {took:.1f}s but Buddy got nothing"
+    assert a11y.names(pid), f"the helper answered in {took:.1f}s but Buddy got nothing from: {done.stdout[-800:]!r}"
 
 
 def test_the_start_menu_has_apps():
