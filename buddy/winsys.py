@@ -48,8 +48,11 @@ _CONNECTED_TO = re.compile(r"^[ \t]*SSID[ \t]*:[ \t]*(.+?)[ \t]*$", re.M)
 
 
 def _enter_apartment() -> None:
-    sys.coinit_flags = 0  # multithreaded, read when comtypes is imported, and what WinRT needs as well
-    import comtypes  # noqa: F401
+    sys.coinit_flags = 0  # multithreaded, as WinRT needs too. comtypes reads this if it's first imported here
+    import comtypes
+    # Said outright as well: if another thread imported comtypes first, the import alone sets up nothing here, and every
+    # call then fails with "CoInitialize has not been called", as the first real Windows test of clicking by name found.
+    comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
 
 
 _com = ThreadPoolExecutor(max_workers=1, thread_name_prefix="windows-com", initializer=_enter_apartment)
