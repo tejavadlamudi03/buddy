@@ -578,7 +578,7 @@ language before listening properly, which is why English is quick: when the Engl
 | `listen.py`, `stt.py`, `tts.py` | Hearing and speaking |
 | `dictation.py` | Holding a key to dictate in any app |
 | `desktop.py`, `desktop_x11.py`, `desktop_windows.py`, `media.py` | Keyboard, mouse, windows, screenshots and media, on Ubuntu or Windows |
-| `winsys.py`, `media_windows.py`, `a11y_helper.ps1` | What Windows does differently: settings, power, audio, the Start menu, media controls |
+| `winsys.py`, `media_windows.py`, `a11y_windows.py` | What Windows does differently: settings, power, audio, the Start menu, media controls |
 | `games.py` | The games and their rules |
 | `models.py` | Which AI models fit this laptop, and downloading them |
 | `whatsapp.py`, `attachments.py` | The WhatsApp bridge, and reading files sent to it |

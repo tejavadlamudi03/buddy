@@ -99,13 +99,23 @@ def test_maximize_minimize_close(notepad):
     assert _wait_for(lambda: notepad.id not in {w.id for w in desktop.list_windows()})
 
 
-def test_buttons_can_be_pressed_by_name(notepad):
+def test_buttons_can_be_seen_by_name(notepad):
+    from buddy import a11y_windows
     pid = desktop.window_pid(notepad.id)
     started = time.monotonic()
-    done = subprocess.run([*a11y.WINDOWS_HELPER, str(pid), "list"], capture_output=True, encoding="utf-8", errors="replace", timeout=60)
-    took = time.monotonic() - started
-    assert '"items"' in done.stdout, (f"{took:.1f}s", done.stdout[-500:], done.stderr[-1500:])
-    assert a11y.names(pid), f"the helper answered in {took:.1f}s but Buddy got nothing from: {done.stdout[-800:]!r}"
+    found = a11y_windows.names(pid)  # straight, so an error shows here rather than being turned into "nothing"
+    assert found, f"nothing pressable after {time.monotonic() - started:.1f}s"
+    assert a11y.names(pid) == found
+
+
+def test_a_button_can_be_pressed_by_name(notepad):
+    """Maximize is in every window's title bar, and pressing it changes nothing that matters."""
+    from buddy import a11y_windows
+    pid = desktop.window_pid(notepad.id)
+    names = a11y_windows.names(pid)
+    button = next((name for name in names if name.lower() in ("maximize", "restore", "minimize")), None)
+    assert button, names
+    assert a11y.press(pid, button)
 
 
 def test_the_start_menu_has_apps():
